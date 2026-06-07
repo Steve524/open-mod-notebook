@@ -4,11 +4,17 @@ export const themeScript = `
   try {
     var theme = JSON.parse(localStorage.getItem('theme-storage') || '{}').state?.theme || 'system';
     var systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    var effectiveTheme = theme === 'system' ? (systemPrefersDark ? 'dark' : 'light') : theme;
-    
-    document.documentElement.classList.remove('light', 'dark');
-    document.documentElement.classList.add(effectiveTheme);
-    document.documentElement.setAttribute('data-theme', effectiveTheme);
+    var resolved = theme === 'system' ? (systemPrefersDark ? 'dark' : 'light') : theme;
+
+    // Mirror themeClassNames() from theme-store.ts: skins layer on a base scheme
+    // (glass -> dark, claude -> light, claude-dark -> dark).
+    var classes = resolved === 'glass' ? ['dark', 'glass']
+      : resolved === 'claude' ? ['light', 'claude']
+      : resolved === 'claude-dark' ? ['dark', 'claude-dark']
+      : [resolved];
+    document.documentElement.classList.remove('light', 'dark', 'glass', 'claude', 'claude-dark');
+    document.documentElement.classList.add.apply(document.documentElement.classList, classes);
+    document.documentElement.setAttribute('data-theme', resolved);
   } catch (e) {
     // Fallback to light theme
     document.documentElement.classList.add('light');
