@@ -34,6 +34,8 @@ async def get_notes(
                 title=note.title,
                 content=note.content,
                 note_type=note.note_type,
+                artifact_type=note.artifact_type,
+                payload=note.payload,
                 created=str(note.created),
                 updated=str(note.updated),
             )
@@ -120,6 +122,8 @@ async def get_note(note_id: str):
             title=note.title,
             content=note.content,
             note_type=note.note_type,
+            artifact_type=note.artifact_type,
+            payload=note.payload,
             created=str(note.created),
             updated=str(note.updated),
         )

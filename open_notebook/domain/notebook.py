@@ -559,6 +559,12 @@ class Note(ObjectModel):
     title: Optional[str] = None
     note_type: Optional[Literal["human", "ai"]] = None
     content: Optional[str] = None
+    # Workshop generators: discriminator for which viewer renders this note
+    # (mindmap | report | flashcards | quiz | infographic | data_table), and
+    # the structured JSON the viewer re-renders from without regenerating.
+    # The note table is schemaless, so these persist with no migration.
+    artifact_type: Optional[str] = None
+    payload: Optional[Dict[str, Any]] = None
 
     @field_validator("content")
     @classmethod

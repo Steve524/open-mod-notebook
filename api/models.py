@@ -191,6 +191,8 @@ class NoteResponse(BaseModel):
     title: Optional[str]
     content: Optional[str]
     note_type: Optional[str]
+    artifact_type: Optional[str] = None
+    payload: Optional[dict] = None
     created: str
     updated: str
     command_id: Optional[str] = None

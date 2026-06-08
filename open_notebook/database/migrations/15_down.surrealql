@@ -1,0 +1,2 @@
+REMOVE FIELD IF EXISTS payload ON TABLE note;
+REMOVE FIELD IF EXISTS artifact_type ON TABLE note;

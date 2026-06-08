@@ -1,0 +1,9 @@
+-- Migration 15: Workshop generator artifacts on notes
+-- The note table is SCHEMAFULL, so generated-artifact fields must be declared
+-- or they are silently dropped on write.
+-- - artifact_type: viewer discriminator (mindmap | report | flashcards | quiz |
+--   infographic | data_table); null for ordinary human/ai notes.
+-- - payload: the validated structured JSON the viewer re-renders from. FLEXIBLE
+--   because its shape varies per artifact type.
+DEFINE FIELD IF NOT EXISTS artifact_type ON TABLE note TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS payload ON TABLE note FLEXIBLE TYPE option<object>;
