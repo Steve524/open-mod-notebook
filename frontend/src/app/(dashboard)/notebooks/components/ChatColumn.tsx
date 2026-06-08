@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { useNotebookChat } from '@/lib/hooks/useNotebookChat'
+import { useNotebookChatBridge } from '@/lib/stores/notebook-chat-bridge'
 import { useNotes } from '@/lib/hooks/use-notes'
 import { ChatPanel } from '@/components/source/ChatPanel'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -64,6 +65,21 @@ export function ChatColumn({ notebookId, contextSelections, sources, sourcesLoad
       charCount: chat.charCount
     }
   }, [sources, notes, contextSelections, chat.tokenCount, chat.charCount])
+
+  // Consume the node->chat bridge: an artifact viewer (e.g. Mind Map) can push
+  // a question into this notebook's chat.
+  const bridgePending = useNotebookChatBridge((s) => s.pending)
+  const clearBridge = useNotebookChatBridge((s) => s.clear)
+  useEffect(() => {
+    if (
+      bridgePending &&
+      bridgePending.notebookId === notebookId &&
+      !chat.isSending
+    ) {
+      chat.sendMessage(bridgePending.message)
+      clearBridge()
+    }
+  }, [bridgePending, notebookId, chat, clearBridge])
 
   // Show loading state while sources/notes are being fetched
   if (sourcesLoading || notesLoading) {

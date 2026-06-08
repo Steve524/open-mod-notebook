@@ -10,12 +10,26 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Plus, StickyNote, Bot, User, MoreVertical, Trash2 } from 'lucide-react'
+import { Plus, StickyNote, Bot, User, MoreVertical, Trash2, Network, FileText, Layers, CircleHelp, Image as ImageIcon, Table } from 'lucide-react'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { Badge } from '@/components/ui/badge'
 import { NoteEditorDialog } from './NoteEditorDialog'
 import { WorkshopTiles } from './WorkshopTiles'
+import { ArtifactViewerDialog } from './ArtifactViewerDialog'
+
+const ARTIFACT_ICONS: Record<string, typeof Network> = {
+  mindmap: Network,
+  report: FileText,
+  flashcards: Layers,
+  quiz: CircleHelp,
+  infographic: ImageIcon,
+  data_table: Table,
+}
+
+function artifactIcon(type?: string | null) {
+  return type ? ARTIFACT_ICONS[type] ?? null : null
+}
 import { getDateLocale } from '@/lib/utils/date-locale'
 import { formatDistanceToNow } from 'date-fns'
 import { ContextToggle } from '@/components/common/ContextToggle'
@@ -48,6 +62,7 @@ export function NotesColumn({
   const [editingNote, setEditingNote] = useState<NoteResponse | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null)
+  const [artifactNote, setArtifactNote] = useState<NoteResponse | null>(null)
 
   const deleteNote = useDeleteNote()
 
@@ -124,15 +139,19 @@ export function NotesColumn({
                   <div
                     key={note.id}
                     className="p-3 border rounded-lg card-hover group relative cursor-pointer"
-                    onClick={() => setEditingNote(note)}
+                    onClick={() => (note.artifact_type ? setArtifactNote(note) : setEditingNote(note))}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        {note.note_type === 'ai' ? (
-                          <Bot className="h-4 w-4 text-primary" />
-                        ) : (
-                          <User className="h-4 w-4 text-muted-foreground" />
-                        )}
+                        {(() => {
+                          const ArtIcon = artifactIcon(note.artifact_type)
+                          if (ArtIcon) return <ArtIcon className="h-4 w-4 text-primary" />
+                          return note.note_type === 'ai' ? (
+                            <Bot className="h-4 w-4 text-primary" />
+                          ) : (
+                            <User className="h-4 w-4 text-muted-foreground" />
+                          )
+                        })()}
                         <Badge variant="secondary" className="text-xs">
                           {note.note_type === 'ai' ? t('common.aiGenerated') : t('common.human')}
                         </Badge>
@@ -225,6 +244,15 @@ export function NotesColumn({
         onConfirm={handleDeleteConfirm}
         isLoading={deleteNote.isPending}
         confirmVariant="destructive"
+      />
+
+      <ArtifactViewerDialog
+        note={artifactNote}
+        open={Boolean(artifactNote)}
+        onOpenChange={(open) => {
+          if (!open) setArtifactNote(null)
+        }}
+        notebookId={notebookId}
       />
     </>
   )
