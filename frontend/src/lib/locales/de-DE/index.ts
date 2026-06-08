@@ -2,6 +2,27 @@
 // Translate values only; do not change keys, placeholders or structure.
 
 export const deDE = {
+  workshop: {
+    title: "Workshop",
+    generateFromSources: "Generate from sources",
+    generating: "Generating…",
+    added: "Added to Notes",
+    generateFailed: "Generation failed",
+    selectSourcesFirst: "Select at least one source first",
+    mindmap: "Mind Map",
+    mindmapDesc: "Visual concept map of your sources",
+    report: "Reports",
+    reportDesc: "Briefing docs, study guides, FAQs",
+    flashcards: "Flashcards",
+    flashcardsDesc: "Q&A cards for active recall",
+    quiz: "Quiz",
+    quizDesc: "Test comprehension of the material",
+    infographic: "Infographic",
+    infographicDesc: "A single shareable visual summary",
+    dataTable: "Data Table",
+    dataTableDesc: "Structured rows & columns with citations",
+    dragToReorder: "Drag to reorder",
+  },
   common: {
     search: "Suchen...",
     create: "Neu",

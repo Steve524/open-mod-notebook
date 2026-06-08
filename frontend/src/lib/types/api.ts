@@ -14,6 +14,9 @@ export interface NoteResponse {
   title: string | null
   content: string | null
   note_type: string | null
+  // Workshop generators: viewer discriminator + structured payload for re-render
+  artifact_type?: string | null
+  payload?: Record<string, unknown> | null
   created: string
   updated: string
 }

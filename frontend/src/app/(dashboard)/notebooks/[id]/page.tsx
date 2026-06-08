@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { useParams } from 'next/navigation'
 import { AppShell } from '@/components/layout/AppShell'
 import { NotebookHeader } from '../components/NotebookHeader'
@@ -11,12 +11,20 @@ import { useNotebook } from '@/lib/hooks/use-notebooks'
 import { useNotebookSources } from '@/lib/hooks/use-sources'
 import { useNotes } from '@/lib/hooks/use-notes'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
-import { useNotebookColumnsStore } from '@/lib/stores/notebook-columns-store'
 import { useIsDesktop } from '@/lib/hooks/use-media-query'
 import { useTranslation } from '@/lib/hooks/use-translation'
-import { cn } from '@/lib/utils'
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from '@/components/ui/resizable'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { FileText, StickyNote, MessageSquare } from 'lucide-react'
+import { FileText, StickyNote, MessageSquare, GripVertical } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import {
+  useNotebookPanelOrderStore,
+  type PanelKey,
+} from '@/lib/stores/notebook-panel-order-store'
 
 export type ContextMode = 'off' | 'insights' | 'full'
 
@@ -42,9 +50,6 @@ export default function NotebookPage() {
     fetchNextPage,
   } = useNotebookSources(notebookId)
   const { data: notes, isLoading: notesLoading } = useNotes(notebookId)
-
-  // Get collapse states for dynamic layout
-  const { sourcesCollapsed, notesCollapsed } = useNotebookColumnsStore()
 
   // Detect desktop to avoid double-mounting ChatColumn
   const isDesktop = useIsDesktop()
@@ -107,6 +112,15 @@ export default function NotebookPage() {
     }))
   }
 
+  // Sources currently in context (mode != 'off') — what the Workshop generates from.
+  const selectedSourceIds = Object.entries(contextSelections.sources)
+    .filter(([, mode]) => mode !== 'off')
+    .map(([id]) => id)
+
+  // Panel order + drag-to-reorder (hooks must run before any early return).
+  const { order, reorder } = useNotebookPanelOrderStore()
+  const [dragKey, setDragKey] = useState<PanelKey | null>(null)
+
   if (notebookLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -124,6 +138,55 @@ export default function NotebookPage() {
         </div>
       </AppShell>
     )
+  }
+
+  const panelConfig: Record<
+    PanelKey,
+    { defaultSize: number; minSize: number; label: string }
+  > = {
+    sources: { defaultSize: 26, minSize: 16, label: t('navigation.sources') },
+    workshop: { defaultSize: 30, minSize: 18, label: t('workshop.title') },
+    chat: { defaultSize: 44, minSize: 24, label: t('common.chat') },
+  }
+
+  const renderPanelBody = (key: PanelKey) => {
+    switch (key) {
+      case 'sources':
+        return (
+          <SourcesColumn
+            sources={sources}
+            isLoading={sourcesLoading}
+            notebookId={notebookId}
+            notebookName={notebook?.name}
+            onRefresh={refetchSources}
+            contextSelections={contextSelections.sources}
+            onContextModeChange={(sourceId, mode) => handleContextModeChange(sourceId, mode, 'source')}
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            fetchNextPage={fetchNextPage}
+          />
+        )
+      case 'workshop':
+        return (
+          <NotesColumn
+            notes={notes}
+            isLoading={notesLoading}
+            notebookId={notebookId}
+            contextSelections={contextSelections.notes}
+            onContextModeChange={(noteId, mode) => handleContextModeChange(noteId, mode, 'note')}
+            selectedSourceIds={selectedSourceIds}
+          />
+        )
+      case 'chat':
+        return (
+          <ChatColumn
+            notebookId={notebookId}
+            contextSelections={contextSelections}
+            sources={sources}
+            sourcesLoading={sourcesLoading}
+          />
+        )
+    }
   }
 
   return (
@@ -179,6 +242,7 @@ export default function NotebookPage() {
                     notebookId={notebookId}
                     contextSelections={contextSelections.notes}
                     onContextModeChange={(noteId, mode) => handleContextModeChange(noteId, mode, 'note')}
+                    selectedSourceIds={selectedSourceIds}
                   />
                 )}
                 {mobileActiveTab === 'chat' && (
@@ -193,53 +257,59 @@ export default function NotebookPage() {
             </>
           )}
 
-          {/* Desktop: Collapsible columns layout */}
-          <div className={cn(
-            'hidden lg:flex h-full min-h-0 gap-6 transition-all duration-150',
-            'flex-row'
-          )}>
-            {/* Sources Column */}
-            <div className={cn(
-              'transition-all duration-150',
-              sourcesCollapsed ? 'w-12 flex-shrink-0' : 'flex-none basis-1/3'
-            )}>
-              <SourcesColumn
-                sources={sources}
-                isLoading={sourcesLoading}
-                notebookId={notebookId}
-                notebookName={notebook?.name}
-                onRefresh={refetchSources}
-                contextSelections={contextSelections.sources}
-                onContextModeChange={(sourceId, mode) => handleContextModeChange(sourceId, mode, 'source')}
-                hasNextPage={hasNextPage}
-                isFetchingNextPage={isFetchingNextPage}
-                fetchNextPage={fetchNextPage}
-              />
-            </div>
-
-            {/* Notes Column */}
-            <div className={cn(
-              'transition-all duration-150',
-              notesCollapsed ? 'w-12 flex-shrink-0' : 'flex-none basis-1/3'
-            )}>
-              <NotesColumn
-                notes={notes}
-                isLoading={notesLoading}
-                notebookId={notebookId}
-                contextSelections={contextSelections.notes}
-                onContextModeChange={(noteId, mode) => handleContextModeChange(noteId, mode, 'note')}
-              />
-            </div>
-
-            {/* Chat Column - always expanded, takes remaining space */}
-            <div className="transition-all duration-150 flex-1 min-w-0 lg:pr-6 lg:-mr-6">
-              <ChatColumn
-                notebookId={notebookId}
-                contextSelections={contextSelections}
-                sources={sources}
-                sourcesLoading={sourcesLoading}
-              />
-            </div>
+          {/* Desktop: resizable, drag-reorderable panels. Default order
+              Sources | Workshop | Chat; grab a panel's header grip to drop it
+              into any order (persisted). autoSaveId is keyed to the current
+              arrangement so sizes persist per order. */}
+          <div className="hidden lg:block flex-1 min-h-0">
+            <ResizablePanelGroup
+              direction="horizontal"
+              autoSaveId={`notebook-panels-${order.join('-')}`}
+              className="h-full"
+            >
+              {order.map((key, index) => (
+                <Fragment key={key}>
+                  {index > 0 && <ResizableHandle withHandle />}
+                  <ResizablePanel
+                    id={key}
+                    order={index}
+                    defaultSize={panelConfig[key].defaultSize}
+                    minSize={panelConfig[key].minSize}
+                    className="min-w-0"
+                  >
+                    <div
+                      className={cn(
+                        'flex h-full flex-col rounded-lg transition-shadow',
+                        dragKey && dragKey !== key && 'ring-1 ring-primary/40'
+                      )}
+                      onDragOver={(e) => {
+                        if (dragKey && dragKey !== key) e.preventDefault()
+                      }}
+                      onDrop={() => {
+                        if (dragKey) reorder(dragKey, key)
+                        setDragKey(null)
+                      }}
+                    >
+                      <div
+                        draggable
+                        onDragStart={() => setDragKey(key)}
+                        onDragEnd={() => setDragKey(null)}
+                        title={t('workshop.dragToReorder')}
+                        className="flex cursor-grab select-none items-center justify-center gap-1.5 py-1 text-muted-foreground hover:text-foreground active:cursor-grabbing"
+                      >
+                        <GripVertical className="h-3.5 w-3.5" />
+                        <span className="text-[11px] font-medium uppercase tracking-wide">
+                          {panelConfig[key].label}
+                        </span>
+                      </div>
+                      <div className="min-h-0 flex-1 px-1 pb-1">
+                        {renderPanelBody(key)}
+                      </div>
+                    </div>
+                  </ResizablePanel>
+                </Fragment>
+              ))}
+            </ResizablePanelGroup>
           </div>
         </div>
       </div>

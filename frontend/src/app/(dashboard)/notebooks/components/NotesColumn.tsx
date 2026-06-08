@@ -15,6 +15,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { Badge } from '@/components/ui/badge'
 import { NoteEditorDialog } from './NoteEditorDialog'
+import { WorkshopTiles } from './WorkshopTiles'
 import { getDateLocale } from '@/lib/utils/date-locale'
 import { formatDistanceToNow } from 'date-fns'
 import { ContextToggle } from '@/components/common/ContextToggle'
@@ -31,6 +32,7 @@ interface NotesColumnProps {
   notebookId: string
   contextSelections?: Record<string, ContextMode>
   onContextModeChange?: (noteId: string, mode: ContextMode) => void
+  selectedSourceIds?: string[]
 }
 
 export function NotesColumn({
@@ -38,7 +40,8 @@ export function NotesColumn({
   isLoading,
   notebookId,
   contextSelections,
-  onContextModeChange
+  onContextModeChange,
+  selectedSourceIds = []
 }: NotesColumnProps) {
   const { t, language } = useTranslation()
   const [showAddDialog, setShowAddDialog] = useState(false)
@@ -83,7 +86,7 @@ export function NotesColumn({
         <Card className="h-full flex flex-col flex-1 overflow-hidden">
           <CardHeader className="pb-3 flex-shrink-0">
             <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-lg">{t('common.notes')}</CardTitle>
+              <CardTitle className="text-lg">{t('workshop.title')}</CardTitle>
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
@@ -101,6 +104,10 @@ export function NotesColumn({
           </CardHeader>
 
           <CardContent className="flex-1 overflow-y-auto min-h-0">
+            <WorkshopTiles
+              notebookId={notebookId}
+              selectedSourceIds={selectedSourceIds}
+            />
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <LoadingSpinner />
