@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Copy, Check, Download } from 'lucide-react'
 import { NoteResponse } from '@/lib/types/api'
 import { cn } from '@/lib/utils'
+import { useNote } from '@/lib/hooks/use-notes'
 import { MindMapViewer } from './viewers/MindMapViewer'
 import { FlashcardsViewer } from './viewers/FlashcardsViewer'
 import { QuizViewer } from './viewers/QuizViewer'
@@ -25,6 +26,15 @@ const MD_CLASS =
 function ReportViewer({ note }: { note: NoteResponse }) {
   const [copied, setCopied] = useState(false)
   const content = note.content ?? ''
+
+  if (!content) {
+    return (
+      <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+        Loading…
+      </div>
+    )
+  }
+
   const copy = async () => {
     await navigator.clipboard.writeText(content)
     setCopied(true)
@@ -69,40 +79,43 @@ interface ArtifactViewerDialogProps {
   notebookId: string
 }
 
-// Opens a saved generator artifact from its stored payload, dispatching to the
-// right interactive viewer by artifact_type.
+// Opens a saved generator artifact. The notes LIST omits `content` (and is
+// otherwise lean), so we fetch the full note by id to guarantee complete
+// content + payload before dispatching to the viewer.
 export function ArtifactViewerDialog({
   note,
   open,
   onOpenChange,
   notebookId,
 }: ArtifactViewerDialogProps) {
-  const type = note?.artifact_type ?? ''
+  const { data: full } = useNote(note?.id, { enabled: open && !!note?.id })
+  const active = full ?? note
+  const type = active?.artifact_type ?? ''
   const isMindMap = type === 'mindmap'
-  const payload = note?.payload ?? {}
+  const payload = active?.payload ?? {}
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={cn('flex flex-col', SIZE[type] ?? DEFAULT_SIZE)}>
         <DialogHeader className={cn(isMindMap && 'px-4 pt-4 pb-2')}>
-          <DialogTitle>{note?.title ?? 'Artifact'}</DialogTitle>
+          <DialogTitle>{active?.title ?? 'Artifact'}</DialogTitle>
         </DialogHeader>
 
-        {note && isMindMap && (
+        {active && isMindMap && (
           <div className="min-h-0 flex-1">
             <MindMapViewer payload={payload} notebookId={notebookId} />
           </div>
         )}
-        {note && type === 'flashcards' && <FlashcardsViewer payload={payload} />}
-        {note && type === 'quiz' && <QuizViewer payload={payload} />}
-        {note && type === 'data_table' && <DataTableViewer payload={payload} />}
-        {note && type === 'infographic' && <InfographicViewer payload={payload} />}
-        {note &&
+        {active && type === 'flashcards' && <FlashcardsViewer payload={payload} />}
+        {active && type === 'quiz' && <QuizViewer payload={payload} />}
+        {active && type === 'data_table' && <DataTableViewer payload={payload} />}
+        {active && type === 'infographic' && <InfographicViewer payload={payload} />}
+        {active &&
           type !== 'mindmap' &&
           type !== 'flashcards' &&
           type !== 'quiz' &&
           type !== 'data_table' &&
-          type !== 'infographic' && <ReportViewer note={note} />}
+          type !== 'infographic' && <ReportViewer note={active} />}
       </DialogContent>
     </Dialog>
   )

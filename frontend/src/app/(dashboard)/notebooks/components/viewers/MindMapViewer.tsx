@@ -62,8 +62,9 @@ function MindNode({ data }: NodeProps) {
       <button
         type="button"
         onClick={d.onAsk}
+        onPointerDown={(e) => e.stopPropagation()}
         title="Ask about this in chat"
-        className="line-clamp-2 flex-1 cursor-pointer text-left leading-tight hover:underline"
+        className="nodrag nopan line-clamp-2 flex-1 cursor-pointer text-left leading-tight hover:underline"
       >
         {d.label}
       </button>
@@ -71,8 +72,9 @@ function MindNode({ data }: NodeProps) {
         <button
           type="button"
           onClick={d.onToggle}
+          onPointerDown={(e) => e.stopPropagation()}
           title={d.collapsed ? 'Expand branch' : 'Collapse branch'}
-          className="ml-1 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-border bg-background/80 text-[10px] text-muted-foreground hover:text-foreground"
+          className="nodrag nopan ml-1 flex h-5 w-5 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border border-border bg-background/80 text-[10px] text-muted-foreground hover:text-foreground"
         >
           {d.collapsed ? '›' : '‹'}
         </button>

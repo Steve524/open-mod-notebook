@@ -56,9 +56,33 @@ export function WorkshopTiles({ notebookId, selectedSourceIds }: WorkshopTilesPr
     if (!hasSources || generating.has(feature)) return
     setGenerating((prev) => new Set(prev).add(feature))
     try {
-      await generatorsApi.generate(notebookId, feature, {
+      // Submit an async job (generation is slow on local models) and poll until
+      // the worker finishes — keeps the request short so nothing times out.
+      const { job_id } = await generatorsApi.generate(notebookId, feature, {
         source_ids: selectedSourceIds,
       })
+
+      const maxPolls = 360 // 360 * 2.5s = 15 min ceiling
+      let done = false
+      for (let i = 0; i < maxPolls && !done; i++) {
+        await new Promise((r) => setTimeout(r, 2500))
+        const s = await generatorsApi.jobStatus(job_id)
+        // The job record carries a (non-null) result object even while running,
+        // so terminal state must be detected from STATUS, not result presence.
+        const terminal = ['completed', 'failed', 'error', 'cancelled'].includes(
+          s.status
+        )
+        if (!terminal) continue
+        const ok = s.status === 'completed' && s.result?.success !== false
+        if (!ok) {
+          throw new Error(
+            s.result?.error_message || s.error_message || t('workshop.generateFailed')
+          )
+        }
+        done = true
+      }
+      if (!done) throw new Error(t('workshop.generateFailed'))
+
       // Save quietly: refresh the notes list so the new card appears on its own.
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notes(notebookId) })
       toast({ title: t('workshop.added'), description: t(labelKey) })

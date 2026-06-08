@@ -7,6 +7,7 @@ from .embedding_commands import (
     rebuild_embeddings_command,
 )
 from .example_commands import analyze_data_command, process_text_command
+from .generator_commands import generate_artifact_command
 from .podcast_commands import generate_podcast_command
 from .source_commands import process_source_command
 
@@ -17,6 +18,7 @@ __all__ = [
     "embed_source_command",
     "rebuild_embeddings_command",
     # Other commands
+    "generate_artifact_command",
     "generate_podcast_command",
     "process_source_command",
     "process_text_command",

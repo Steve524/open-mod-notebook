@@ -1,5 +1,4 @@
 import apiClient from './client'
-import { NoteResponse } from '@/lib/types/api'
 
 // The six Workshop generators. Values match the backend route segments
 // (POST /notebooks/{id}/generate/{feature}).
@@ -28,16 +27,39 @@ export interface GenerateOptions {
   style?: string
 }
 
+export interface GenerateJobResponse {
+  job_id: string
+  status: string
+}
+
+export interface JobStatus {
+  job_id: string
+  status: string
+  result?: {
+    success?: boolean
+    note_id?: string
+    artifact_type?: string
+    error_message?: string
+  } | null
+  error_message?: string | null
+}
+
 export const generatorsApi = {
+  // Submits an async generation job; returns immediately with a job_id.
   generate: async (
     notebookId: string,
     feature: GeneratorFeature,
     options: GenerateOptions
   ) => {
-    const response = await apiClient.post<NoteResponse>(
+    const response = await apiClient.post<GenerateJobResponse>(
       `/notebooks/${notebookId}/generate/${feature}`,
       options
     )
+    return response.data
+  },
+
+  jobStatus: async (jobId: string) => {
+    const response = await apiClient.get<JobStatus>(`/commands/jobs/${jobId}`)
     return response.data
   },
 }
