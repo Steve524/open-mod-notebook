@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useId } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCreateDialogs } from '@/lib/hooks/use-create-dialogs'
 import { useNotebooks } from '@/lib/hooks/use-notebooks'
-import { useTheme } from '@/lib/stores/theme-store'
+import { useTheme, type Theme } from '@/lib/stores/theme-store'
 import {
   CommandDialog,
   CommandInput,
@@ -27,6 +27,9 @@ import {
   Sun,
   Moon,
   Monitor,
+  Sparkles,
+  Asterisk,
+  MoonStar,
   Loader2,
 } from 'lucide-react'
 import { useTranslation } from '@/lib/hooks/use-translation'
@@ -52,7 +55,10 @@ const getCreateItems = (t: TFunction) => [
 const getThemeItems = (t: TFunction) => [
   { name: t('common.light'), value: 'light' as const, icon: Sun, keywords: ['bright', 'day'] },
   { name: t('common.dark'), value: 'dark' as const, icon: Moon, keywords: ['night'] },
+  { name: t('common.glass'), value: 'glass' as const, icon: Sparkles, keywords: ['frosted', 'blur', 'translucent'] },
   { name: t('common.system'), value: 'system' as const, icon: Monitor, keywords: ['auto', 'default'] },
+  { name: t('common.claude'), value: 'claude' as const, icon: Asterisk, keywords: ['warm', 'light', 'brand', 'anthropic'] },
+  { name: t('common.claudeDark'), value: 'claude-dark' as const, icon: MoonStar, keywords: ['warm', 'dark', 'brand', 'anthropic'] },
 ]
 
 export function CommandPalette() {
@@ -130,7 +136,7 @@ export function CommandPalette() {
     })
   }, [handleSelect, openSourceDialog, openNotebookDialog, openPodcastDialog])
 
-  const handleTheme = useCallback((theme: 'light' | 'dark' | 'system') => {
+  const handleTheme = useCallback((theme: Theme) => {
     handleSelect(() => setTheme(theme))
   }, [handleSelect, setTheme])
 

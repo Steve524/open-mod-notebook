@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Sun, Moon, Monitor } from 'lucide-react'
+import { Sun, Moon, Monitor, Sparkles, Asterisk, MoonStar } from 'lucide-react'
 import { useTranslation } from '@/lib/hooks/use-translation'
 
 interface ThemeToggleProps {
@@ -50,12 +50,33 @@ export function ThemeToggle({ iconOnly = false }: ThemeToggleProps) {
           <Moon className="mr-2 h-4 w-4" />
           <span>{t('common.dark')}</span>
         </DropdownMenuItem>
-        <DropdownMenuItem 
+        <DropdownMenuItem
+          onClick={() => setTheme('glass')}
+          className={theme === 'glass' ? 'bg-accent' : ''}
+        >
+          <Sparkles className="mr-2 h-4 w-4" />
+          <span>{t('common.glass')}</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem
           onClick={() => setTheme('system')}
           className={theme === 'system' ? 'bg-accent' : ''}
         >
           <Monitor className="mr-2 h-4 w-4" />
           <span>{t('common.system')}</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => setTheme('claude')}
+          className={theme === 'claude' ? 'bg-accent' : ''}
+        >
+          <Asterisk className="mr-2 h-4 w-4" />
+          <span>{t('common.claude')}</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => setTheme('claude-dark')}
+          className={theme === 'claude-dark' ? 'bg-accent' : ''}
+        >
+          <MoonStar className="mr-2 h-4 w-4" />
+          <span>{t('common.claudeDark')}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
