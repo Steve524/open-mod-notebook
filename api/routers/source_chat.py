@@ -14,7 +14,7 @@ from open_notebook.domain.notebook import ChatSession, Source
 from open_notebook.exceptions import (
     NotFoundError,
 )
-from open_notebook.graphs.source_chat import source_chat_graph as source_chat_graph
+from open_notebook.graphs.source_chat import get_source_chat_graph
 from open_notebook.utils.graph_utils import get_session_message_count
 
 router = APIRouter()
@@ -163,7 +163,7 @@ async def get_source_chat_sessions(source_id: str = Path(..., description="Sourc
 
                     # Get message count from LangGraph state
                     msg_count = await get_session_message_count(
-                        source_chat_graph, session_id
+                        await get_source_chat_graph(), session_id
                     )
 
                     sessions.append(
@@ -234,9 +234,8 @@ async def get_source_chat_session(
 
         # Get session state from LangGraph to retrieve messages
         # Use sync get_state() in a thread since SqliteSaver doesn't support async
-        thread_state = await asyncio.to_thread(
-            source_chat_graph.get_state,
-            config=RunnableConfig(configurable={"thread_id": full_session_id}),
+        thread_state = await (await get_source_chat_graph()).aget_state(
+            config=RunnableConfig(configurable={"thread_id": full_session_id})
         )
 
         # Extract messages from state
@@ -339,7 +338,9 @@ async def update_source_chat_session(
         await session.save()
 
         # Get message count from LangGraph state
-        msg_count = await get_session_message_count(source_chat_graph, full_session_id)
+        msg_count = await get_session_message_count(
+            await get_source_chat_graph(), full_session_id
+        )
 
         return SourceChatSessionResponse(
             id=session.id or "",
@@ -421,9 +422,8 @@ async def stream_source_chat_response(
     try:
         # Get current state
         # Use sync get_state() in a thread since SqliteSaver doesn't support async
-        current_state = await asyncio.to_thread(
-            source_chat_graph.get_state,
-            config=RunnableConfig(configurable={"thread_id": session_id}),
+        current_state = await (await get_source_chat_graph()).aget_state(
+            config=RunnableConfig(configurable={"thread_id": session_id})
         )
 
         # Prepare state for execution
@@ -441,7 +441,7 @@ async def stream_source_chat_response(
         yield f"data: {json.dumps(user_event)}\n\n"
 
         # Execute source chat graph synchronously (like notebook chat does)
-        result = source_chat_graph.invoke(
+        result = await (await get_source_chat_graph()).ainvoke(
             input=state_values,  # type: ignore[arg-type]
             config=RunnableConfig(
                 configurable={"thread_id": session_id, "model_id": model_override}

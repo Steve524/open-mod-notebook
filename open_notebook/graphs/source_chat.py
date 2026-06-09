@@ -1,11 +1,11 @@
 import asyncio
-import sqlite3
 from typing import Annotated, Dict, List, Optional
 
+import aiosqlite
 from ai_prompter import Prompter
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
@@ -30,7 +30,7 @@ class SourceChatState(TypedDict):
     context_indicators: Optional[Dict[str, List[str]]]
 
 
-def call_model_with_source_context(
+async def call_model_with_source_context(
     state: SourceChatState, config: RunnableConfig
 ) -> dict:
     """
@@ -43,7 +43,7 @@ def call_model_with_source_context(
     4. Tracks context indicators for referenced insights/content
     """
     try:
-        return _call_model_with_source_context_inner(state, config)
+        return await _call_model_with_source_context_inner(state, config)
     except OpenNotebookError:
         raise
     except Exception as e:
@@ -51,43 +51,21 @@ def call_model_with_source_context(
         raise error_class(user_message) from e
 
 
-def _call_model_with_source_context_inner(
+async def _call_model_with_source_context_inner(
     state: SourceChatState, config: RunnableConfig
 ) -> dict:
     source_id = state.get("source_id")
     if not source_id:
         raise ValueError("source_id is required in state")
 
-    # Build source context using ContextBuilder (run async code in new loop)
-    def build_context():
-        """Build context in a new event loop"""
-        new_loop = asyncio.new_event_loop()
-        try:
-            asyncio.set_event_loop(new_loop)
-            context_builder = ContextBuilder(
-                source_id=source_id,
-                include_insights=True,
-                include_notes=False,  # Focus on source-specific content
-                max_tokens=50000,  # Reasonable limit for source context
-            )
-            return new_loop.run_until_complete(context_builder.build())
-        finally:
-            new_loop.close()
-            asyncio.set_event_loop(None)
-
-    # Get the built context
-    try:
-        # Try to get the current event loop
-        asyncio.get_running_loop()
-        # If we're in an event loop, run in a thread with a new loop
-        import concurrent.futures
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(build_context)
-            context_data = future.result()
-    except RuntimeError:
-        # No event loop running, safe to create a new one
-        context_data = build_context()
+    # Build source context (async).
+    context_builder = ContextBuilder(
+        source_id=source_id,
+        include_insights=True,
+        include_notes=False,  # Focus on source-specific content
+        max_tokens=50000,  # Reasonable limit for source context
+    )
+    context_data = await context_builder.build()
 
     # Extract source and insights from context
     source = None
@@ -130,47 +108,13 @@ def _call_model_with_source_context_inner(
     )
     payload = [SystemMessage(content=system_prompt)] + state.get("messages", [])
 
-    # Handle async model provisioning from sync context
-    def run_in_new_loop():
-        """Run the async function in a new event loop"""
-        new_loop = asyncio.new_event_loop()
-        try:
-            asyncio.set_event_loop(new_loop)
-            return new_loop.run_until_complete(
-                provision_langchain_model(
-                    str(payload),
-                    config.get("configurable", {}).get("model_id")
-                    or state.get("model_override"),
-                    "chat",
-                    max_tokens=8192,
-                )
-            )
-        finally:
-            new_loop.close()
-            asyncio.set_event_loop(None)
-
-    try:
-        # Try to get the current event loop
-        asyncio.get_running_loop()
-        # If we're in an event loop, run in a thread with a new loop
-        import concurrent.futures
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(run_in_new_loop)
-            model = future.result()
-    except RuntimeError:
-        # No event loop running, safe to use asyncio.run()
-        model = asyncio.run(
-            provision_langchain_model(
-                str(payload),
-                config.get("configurable", {}).get("model_id")
-                or state.get("model_override"),
-                "chat",
-                max_tokens=8192,
-            )
-        )
-
-    ai_message = model.invoke(payload)
+    model = await provision_langchain_model(
+        str(payload),
+        config.get("configurable", {}).get("model_id") or state.get("model_override"),
+        "chat",
+        max_tokens=8192,
+    )
+    ai_message = await model.ainvoke(payload)
 
     # Clean thinking content from AI response (e.g., <think>...</think> tags)
     content = extract_text_content(ai_message.content)
@@ -240,20 +184,30 @@ def _format_source_context(context_data: Dict) -> str:
     return "\n".join(context_parts)
 
 
-# Create SQLite checkpointer
-conn = sqlite3.connect(
-    LANGGRAPH_CHECKPOINT_FILE,
-    check_same_thread=False,
-)
-# Shared connection across concurrent source-chat sessions: WAL + busy_timeout
-# avoid "database is locked" under concurrent checkpoint writes.
-conn.execute("PRAGMA journal_mode=WAL")
-conn.execute("PRAGMA busy_timeout=5000")
-memory = SqliteSaver(conn)
+# Lazily compiled with an AsyncSqliteSaver (built inside a running loop). See
+# chat.py.get_chat_graph for the rationale.
+_graph = None
+_graph_lock = asyncio.Lock()
 
-# Create the StateGraph
-source_chat_state = StateGraph(SourceChatState)
-source_chat_state.add_node("source_chat_agent", call_model_with_source_context)
-source_chat_state.add_edge(START, "source_chat_agent")
-source_chat_state.add_edge("source_chat_agent", END)
-source_chat_graph = source_chat_state.compile(checkpointer=memory)
+
+def _build_source_chat_graph() -> StateGraph:
+    builder = StateGraph(SourceChatState)
+    builder.add_node("source_chat_agent", call_model_with_source_context)
+    builder.add_edge(START, "source_chat_agent")
+    builder.add_edge("source_chat_agent", END)
+    return builder
+
+
+async def get_source_chat_graph():
+    """Return the compiled source-chat graph (async checkpointer), built once."""
+    global _graph
+    if _graph is None:
+        async with _graph_lock:
+            if _graph is None:
+                conn = aiosqlite.connect(
+                    LANGGRAPH_CHECKPOINT_FILE, check_same_thread=False
+                )
+                _graph = _build_source_chat_graph().compile(
+                    checkpointer=AsyncSqliteSaver(conn)
+                )
+    return _graph

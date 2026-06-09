@@ -12,7 +12,7 @@ from open_notebook.domain.notebook import ChatSession, Note, Notebook, Source
 from open_notebook.exceptions import (
     NotFoundError,
 )
-from open_notebook.graphs.chat import graph as chat_graph
+from open_notebook.graphs.chat import get_chat_graph
 from open_notebook.utils.graph_utils import get_session_message_count
 
 router = APIRouter()
@@ -110,7 +110,9 @@ async def get_sessions(notebook_id: str = Query(..., description="Notebook ID"))
             session_id = str(session.id)
 
             # Get message count from LangGraph state
-            msg_count = await get_session_message_count(chat_graph, session_id)
+            msg_count = await get_session_message_count(
+                await get_chat_graph(), session_id
+            )
 
             results.append(
                 ChatSessionResponse(
@@ -191,9 +193,8 @@ async def get_session(session_id: str):
 
         # Get session state from LangGraph to retrieve messages
         # Use sync get_state() in a thread since SqliteSaver doesn't support async
-        thread_state = await asyncio.to_thread(
-            chat_graph.get_state,
-            config=RunnableConfig(configurable={"thread_id": full_session_id}),
+        thread_state = await (await get_chat_graph()).aget_state(
+            config=RunnableConfig(configurable={"thread_id": full_session_id})
         )
 
         # Extract messages from state
@@ -285,7 +286,9 @@ async def update_session(session_id: str, request: UpdateSessionRequest):
         notebook_id = notebook_query[0]["out"] if notebook_query else None
 
         # Get message count from LangGraph state
-        msg_count = await get_session_message_count(chat_graph, full_session_id)
+        msg_count = await get_session_message_count(
+            await get_chat_graph(), full_session_id
+        )
 
         return ChatSessionResponse(
             id=session.id or "",
@@ -360,9 +363,8 @@ async def execute_chat(request: ExecuteChatRequest):
 
         # Get current state
         # Use sync get_state() in a thread since SqliteSaver doesn't support async
-        current_state = await asyncio.to_thread(
-            chat_graph.get_state,
-            config=RunnableConfig(configurable={"thread_id": full_session_id}),
+        current_state = await (await get_chat_graph()).aget_state(
+            config=RunnableConfig(configurable={"thread_id": full_session_id})
         )
 
         # Prepare state for execution
@@ -379,7 +381,7 @@ async def execute_chat(request: ExecuteChatRequest):
         state_values["messages"].append(user_message)
 
         # Execute chat graph
-        result = chat_graph.invoke(
+        result = await (await get_chat_graph()).ainvoke(
             input=state_values,  # type: ignore[arg-type]
             config=RunnableConfig(
                 configurable={

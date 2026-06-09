@@ -1,11 +1,11 @@
 import asyncio
-import sqlite3
 from typing import Annotated, Optional
 
+import aiosqlite
 from ai_prompter import Prompter
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
@@ -27,7 +27,7 @@ class ThreadState(TypedDict):
     model_override: Optional[str]
 
 
-def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict:
+async def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict:
     try:
         system_prompt = Prompter(prompt_template="chat/system").render(data=state)  # type: ignore[arg-type]
         payload = [SystemMessage(content=system_prompt)] + state.get("messages", [])
@@ -35,42 +35,10 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
             "model_override"
         )
 
-        # Handle async model provisioning from sync context
-        def run_in_new_loop():
-            """Run the async function in a new event loop"""
-            new_loop = asyncio.new_event_loop()
-            try:
-                asyncio.set_event_loop(new_loop)
-                return new_loop.run_until_complete(
-                    provision_langchain_model(
-                        str(payload), model_id, "chat", max_tokens=8192
-                    )
-                )
-            finally:
-                new_loop.close()
-                asyncio.set_event_loop(None)
-
-        try:
-            # Try to get the current event loop
-            asyncio.get_running_loop()
-            # If we're in an event loop, run in a thread with a new loop
-            import concurrent.futures
-
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(run_in_new_loop)
-                model = future.result()
-        except RuntimeError:
-            # No event loop running, safe to use asyncio.run()
-            model = asyncio.run(
-                provision_langchain_model(
-                    str(payload),
-                    model_id,
-                    "chat",
-                    max_tokens=8192,
-                )
-            )
-
-        ai_message = model.invoke(payload)
+        model = await provision_langchain_model(
+            str(payload), model_id, "chat", max_tokens=8192
+        )
+        ai_message = await model.ainvoke(payload)
 
         # Clean thinking content from AI response (e.g., <think>...</think> tags)
         content = extract_text_content(ai_message.content)
@@ -85,20 +53,32 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
         raise error_class(user_message) from e
 
 
-conn = sqlite3.connect(
-    LANGGRAPH_CHECKPOINT_FILE,
-    check_same_thread=False,
-)
-# This connection is shared across concurrent chat sessions (the node runs in a
-# thread pool via asyncio.to_thread). WAL lets readers proceed during a write,
-# and busy_timeout makes a blocked writer wait instead of raising
-# "database is locked" — the main concurrency failure mode for the shared saver.
-conn.execute("PRAGMA journal_mode=WAL")
-conn.execute("PRAGMA busy_timeout=5000")
-memory = SqliteSaver(conn)
+# AsyncSqliteSaver must be constructed inside a running event loop (its __init__
+# grabs the loop), so the graph is compiled lazily on first use and cached. Each
+# aiosqlite connection runs SQLite on its own thread, which removes the shared
+# sync-connection concurrency hazard that the old sync SqliteSaver had.
+_graph = None
+_graph_lock = asyncio.Lock()
 
-agent_state = StateGraph(ThreadState)
-agent_state.add_node("agent", call_model_with_messages)
-agent_state.add_edge(START, "agent")
-agent_state.add_edge("agent", END)
-graph = agent_state.compile(checkpointer=memory)
+
+def _build_chat_graph() -> StateGraph:
+    builder = StateGraph(ThreadState)
+    builder.add_node("agent", call_model_with_messages)
+    builder.add_edge(START, "agent")
+    builder.add_edge("agent", END)
+    return builder
+
+
+async def get_chat_graph():
+    """Return the compiled chat graph (async checkpointer), building it once."""
+    global _graph
+    if _graph is None:
+        async with _graph_lock:
+            if _graph is None:
+                conn = aiosqlite.connect(
+                    LANGGRAPH_CHECKPOINT_FILE, check_same_thread=False
+                )
+                _graph = _build_chat_graph().compile(
+                    checkpointer=AsyncSqliteSaver(conn)
+                )
+    return _graph
