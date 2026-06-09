@@ -89,6 +89,12 @@ conn = sqlite3.connect(
     LANGGRAPH_CHECKPOINT_FILE,
     check_same_thread=False,
 )
+# This connection is shared across concurrent chat sessions (the node runs in a
+# thread pool via asyncio.to_thread). WAL lets readers proceed during a write,
+# and busy_timeout makes a blocked writer wait instead of raising
+# "database is locked" — the main concurrency failure mode for the shared saver.
+conn.execute("PRAGMA journal_mode=WAL")
+conn.execute("PRAGMA busy_timeout=5000")
 memory = SqliteSaver(conn)
 
 agent_state = StateGraph(ThreadState)

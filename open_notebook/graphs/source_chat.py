@@ -245,6 +245,10 @@ conn = sqlite3.connect(
     LANGGRAPH_CHECKPOINT_FILE,
     check_same_thread=False,
 )
+# Shared connection across concurrent source-chat sessions: WAL + busy_timeout
+# avoid "database is locked" under concurrent checkpoint writes.
+conn.execute("PRAGMA journal_mode=WAL")
+conn.execute("PRAGMA busy_timeout=5000")
 memory = SqliteSaver(conn)
 
 # Create the StateGraph
