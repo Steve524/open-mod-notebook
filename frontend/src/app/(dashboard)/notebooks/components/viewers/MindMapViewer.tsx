@@ -51,20 +51,24 @@ function MindNode({ data }: NodeProps) {
   return (
     <div
       className={cn(
-        'relative flex items-center rounded-full border px-3 py-2 text-xs shadow-sm backdrop-blur-sm transition-colors',
+        'group relative flex items-center rounded-full border px-3 py-2 text-xs shadow-sm backdrop-blur-sm transition-colors',
         d.isRoot
           ? 'border-primary/60 bg-primary/20 font-semibold text-foreground'
           : 'border-border bg-card/80 text-foreground'
       )}
       style={{ width: NODE_W, height: NODE_H }}
     >
-      <Handle type="target" position={Position.Left} className="!opacity-0" />
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!pointer-events-none !opacity-0"
+      />
       <button
         type="button"
         onClick={d.onAsk}
         onPointerDown={(e) => e.stopPropagation()}
         title="Ask about this in chat"
-        className="nodrag nopan line-clamp-2 flex-1 cursor-pointer text-left leading-tight hover:underline"
+        className="nodrag nopan line-clamp-2 flex-1 cursor-pointer text-left leading-tight group-hover:underline"
       >
         {d.label}
       </button>
@@ -79,7 +83,11 @@ function MindNode({ data }: NodeProps) {
           {d.collapsed ? '›' : '‹'}
         </button>
       )}
-      <Handle type="source" position={Position.Right} className="!opacity-0" />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!pointer-events-none !opacity-0"
+      />
     </div>
   )
 }
@@ -98,7 +106,7 @@ function layoutTree(
   root: MindMapTree,
   collapsed: Set<string>,
   onToggle: (id: string) => void,
-  onAsk: (label: string) => void
+  askQuestion: (message: string) => void
 ): { nodes: Node[]; edges: Edge[] } {
   const g = new dagre.graphlib.Graph()
   g.setGraph({ rankdir: 'LR', nodesep: 18, ranksep: 70 })
@@ -107,8 +115,16 @@ function layoutTree(
   const nodes: Node[] = []
   const edges: Edge[] = []
 
-  const walk = (node: MindMapTree, parentId: string | null, isRoot: boolean) => {
+  const walk = (
+    node: MindMapTree,
+    parentId: string | null,
+    isRoot: boolean,
+    parentLabel: string
+  ) => {
     const hasChildren = !!node.children && node.children.length > 0
+    const message = isRoot
+      ? `Discuss what these sources say about ${node.label}.`
+      : `Discuss what these sources say about ${node.label}, in the larger context of ${parentLabel}.`
     g.setNode(node.id, { width: NODE_W, height: NODE_H })
     nodes.push({
       id: node.id,
@@ -120,7 +136,7 @@ function layoutTree(
         hasChildren,
         collapsed: collapsed.has(node.id),
         onToggle: () => onToggle(node.id),
-        onAsk: () => onAsk(node.label),
+        onAsk: () => askQuestion(message),
       } satisfies MindNodeData,
     })
     if (parentId) {
@@ -134,11 +150,11 @@ function layoutTree(
       })
     }
     if (hasChildren && !collapsed.has(node.id)) {
-      node.children!.forEach((c) => walk(c, node.id, false))
+      node.children!.forEach((c) => walk(c, node.id, false, node.label))
     }
   }
 
-  walk(root, null, true)
+  walk(root, null, true, '')
   dagre.layout(g)
   nodes.forEach((n) => {
     const p = g.node(n.id)
@@ -184,16 +200,16 @@ function Flow({ root, notebookId }: { root: MindMapTree; notebookId: string }) {
     })
   }, [])
 
-  const onAsk = useCallback(
-    (label: string) => {
-      ask(notebookId, `Tell me more about "${label}" based on my sources.`)
+  const askQuestion = useCallback(
+    (message: string) => {
+      ask(notebookId, message)
     },
     [ask, notebookId]
   )
 
   const { nodes, edges } = useMemo(
-    () => layoutTree(root, collapsed, onToggle, onAsk),
-    [root, collapsed, onToggle, onAsk]
+    () => layoutTree(root, collapsed, onToggle, askQuestion),
+    [root, collapsed, onToggle, askQuestion]
   )
 
   const expandAll = useCallback(() => setCollapsed(new Set()), [])
@@ -230,7 +246,6 @@ function Flow({ root, notebookId }: { root: MindMapTree; notebookId: string }) {
         maxZoom={2}
         nodesDraggable={false}
         nodesConnectable={false}
-        elementsSelectable={false}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} className="opacity-40" />
       </ReactFlow>
