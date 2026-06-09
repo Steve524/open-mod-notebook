@@ -34,6 +34,43 @@
   </p>
 </div>
 
+---
+
+## 🍴 Fork additions (this repository)
+
+This is a **local-Docker-focused fork** of [lfnovo/open-notebook](https://github.com/lfnovo/open-notebook). It builds the image from your local source (via `docker-compose.local.yml`) so code changes are actually compiled into the running container, and it adds the following on top of upstream:
+
+### 🛠️ Workshop generators — 6 NotebookLM-style artifacts
+
+The notebook page has a **"Generate from sources"** tile grid that turns your selected sources into reusable, auto-saved Notes. Generation runs as a **background job** (so slow/local models never time out the request), and each artifact opens in its own interactive viewer:
+
+- **Mind Map** — an interactive concept tree (React Flow + dagre): expand/collapse branches, zoom/fit, download as PNG, and click a node to ask the chat about that concept in context.
+- **Reports** — a structured Markdown document (Briefing Document, Study Guide, FAQ, Timeline, or Custom) with copy / download.
+- **Flashcards** — a flip-card deck for active recall, with shuffle and known/missed tracking.
+- **Quiz** — multiple-choice & short-answer questions with instant feedback, hints, and a running score.
+- **Infographic** — a themed HTML/SVG visual summary (key stats + sections), exportable to PNG.
+- **Data Table** — an auditable, sortable table extracted from your sources, with per-cell source citations on hover and CSV export.
+
+Every result is grounded strictly in the selected sources and saved as a typed Note, so you can reopen it any time without regenerating.
+
+### 🎨 Three new themes
+
+Alongside Light / Dark / System, the theme switcher (sidebar and ⌘K command palette) adds:
+
+- **Glass** — a dark glassmorphism skin with translucent surfaces and backdrop blur.
+- **Daybreak** — a warm, paper-like light theme (cream surfaces, clay accent).
+- **Dusk** — a warm dark theme (espresso surfaces, brighter clay accent).
+
+### 🐳 Running locally (Docker)
+
+```bash
+docker compose -f docker-compose.local.yml up --build -d
+```
+
+This builds the image from source and starts the app + SurrealDB. Configure a model provider in **Settings → Models** after it's running (local Ollama works well for the generators).
+
+---
+
 <p align="center">
 <a href="https://trendshift.io/repositories/14536" target="_blank"><img src="https://trendshift.io/api/badge/repositories/14536" alt="lfnovo%2Fopen-notebook | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
