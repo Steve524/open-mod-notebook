@@ -103,6 +103,7 @@ async def generate_mindmap(
         "source_ids": [str(s.id) for s in sources],
         "steering_prompt": steering_prompt,
         "language": language,
+        "options": {},
     }
     title = f"Mind Map — {notebook_title}" if notebook_title else "Mind Map"
     return await save_artifact_note(

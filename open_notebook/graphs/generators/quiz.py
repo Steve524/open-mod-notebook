@@ -121,6 +121,11 @@ async def generate_quiz(
             "source_ids": [str(s.id) for s in sources],
             "steering_prompt": steering_prompt,
             "language": language,
+            "options": {
+                "difficulty": difficulty,
+                "quantity": quantity,
+                "question_count": question_count,
+            },
         },
     }
     title = f"Quiz — {notebook_title}" if notebook_title else "Quiz"

@@ -19,6 +19,11 @@ export const enUS = {
     dataTable: "Data Table",
     dataTableDesc: "Structured rows & columns with citations",
     dragToReorder: "Drag to reorder",
+    customize: "Customize",
+    generate: "Generate",
+    steering: "Steering",
+    steeringPlaceholder: "Focus the result on a topic, tone, or angle…",
+    steeringHelper: "Optional. It can't add facts that aren't in your sources.",
   },
   common: {
     search: "Search...",

@@ -86,6 +86,7 @@ async def generate_report(
             "source_ids": [str(s.id) for s in sources],
             "steering_prompt": steering_prompt,
             "language": language,
+            "options": {"template": template, "length": length},
         },
     }
     title = f"{template} — {notebook_title}" if notebook_title else template

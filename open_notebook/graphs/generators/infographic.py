@@ -132,6 +132,7 @@ async def generate_infographic(
         "source_ids": [str(s.id) for s in sources],
         "steering_prompt": steering_prompt,
         "language": language,
+        "options": {"orientation": orientation, "detail": detail, "style": style},
     }
     title = f"Infographic — {notebook_title}" if notebook_title else "Infographic"
     return await save_artifact_note(

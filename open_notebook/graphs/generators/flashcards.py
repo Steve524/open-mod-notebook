@@ -120,6 +120,11 @@ async def generate_flashcards(
             "source_ids": [str(s.id) for s in sources],
             "steering_prompt": steering_prompt,
             "language": language,
+            "options": {
+                "difficulty": difficulty,
+                "quantity": quantity,
+                "card_count": card_count,
+            },
         },
     }
     title = f"Flashcards — {notebook_title}" if notebook_title else "Flashcards"

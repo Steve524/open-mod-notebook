@@ -10,14 +10,20 @@ import {
   Image as ImageIcon,
   Table,
   Loader2,
+  Pencil,
   type LucideIcon,
 } from 'lucide-react'
-import { generatorsApi, GeneratorFeature } from '@/lib/api/generators'
+import {
+  generatorsApi,
+  GeneratorFeature,
+  GenerateOptions,
+} from '@/lib/api/generators'
 import { QUERY_KEYS } from '@/lib/api/query-client'
 import { useToast } from '@/lib/hooks/use-toast'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { getApiErrorKey } from '@/lib/utils/error-handler'
 import { cn } from '@/lib/utils'
+import { GenerationOptionsPanel } from './GenerationOptionsPanel'
 
 interface WorkshopTilesProps {
   notebookId: string
@@ -49,10 +55,17 @@ export function WorkshopTiles({ notebookId, selectedSourceIds }: WorkshopTilesPr
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const [generating, setGenerating] = useState<Set<string>>(new Set())
+  const [customizeFeature, setCustomizeFeature] = useState<GeneratorFeature | null>(
+    null
+  )
 
   const hasSources = selectedSourceIds.length > 0
 
-  const run = async (feature: GeneratorFeature, labelKey: string) => {
+  const run = async (
+    feature: GeneratorFeature,
+    labelKey: string,
+    extra?: Partial<GenerateOptions>
+  ) => {
     if (!hasSources || generating.has(feature)) return
     setGenerating((prev) => new Set(prev).add(feature))
     try {
@@ -60,6 +73,7 @@ export function WorkshopTiles({ notebookId, selectedSourceIds }: WorkshopTilesPr
       // the worker finishes — keeps the request short so nothing times out.
       const { job_id } = await generatorsApi.generate(notebookId, feature, {
         source_ids: selectedSourceIds,
+        ...extra,
       })
 
       const maxPolls = 360 // 360 * 2.5s = 15 min ceiling
@@ -101,6 +115,9 @@ export function WorkshopTiles({ notebookId, selectedSourceIds }: WorkshopTilesPr
     }
   }
 
+  const customizeTitleKey =
+    TILES.find((x) => x.feature === customizeFeature)?.titleKey ?? ''
+
   return (
     <div className="mb-4">
       <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -109,45 +126,71 @@ export function WorkshopTiles({ notebookId, selectedSourceIds }: WorkshopTilesPr
       <div className="grid grid-cols-2 gap-2">
         {TILES.map(({ feature, icon: Icon, titleKey, descKey, accent }) => {
           const busy = generating.has(feature)
+          const disabled = !hasSources || busy
           return (
-            <button
+            <div
               key={feature}
-              type="button"
-              onClick={() => run(feature, titleKey)}
-              disabled={!hasSources || busy}
               title={!hasSources ? t('workshop.selectSourcesFirst') : undefined}
               style={{ ['--tile-accent']: accent } as React.CSSProperties}
               className={cn(
-                'group relative flex flex-col gap-1 rounded-[13px] border p-3 text-left transition-all',
+                'group relative rounded-[13px] border p-3 transition-all',
                 'hover:-translate-y-0.5 hover:border-[var(--ring)]',
                 'hover:shadow-[0_8px_24px_-12px_var(--tile-accent)]',
-                'disabled:opacity-50 disabled:pointer-events-none'
+                disabled && 'pointer-events-none opacity-50'
               )}
             >
-              <span
-                className="flex h-7 w-7 items-center justify-center rounded-lg"
-                style={{
-                  backgroundColor:
-                    'color-mix(in oklch, var(--tile-accent) 20%, transparent)',
-                  color: 'var(--tile-accent)',
-                }}
+              <button
+                type="button"
+                onClick={() => run(feature, titleKey)}
+                className="flex w-full flex-col gap-1 text-left"
               >
-                {busy ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Icon className="h-4 w-4" />
-                )}
-              </span>
-              <span className="text-[13px] font-medium leading-tight">
-                {t(titleKey)}
-              </span>
-              <span className="line-clamp-2 text-[10.5px] leading-snug text-muted-foreground">
-                {busy ? t('workshop.generating') : t(descKey)}
-              </span>
-            </button>
+                <span
+                  className="flex h-7 w-7 items-center justify-center rounded-lg"
+                  style={{
+                    backgroundColor:
+                      'color-mix(in oklch, var(--tile-accent) 20%, transparent)',
+                    color: 'var(--tile-accent)',
+                  }}
+                >
+                  {busy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Icon className="h-4 w-4" />
+                  )}
+                </span>
+                <span className="text-[13px] font-medium leading-tight">
+                  {t(titleKey)}
+                </span>
+                <span className="line-clamp-2 text-[10.5px] leading-snug text-muted-foreground">
+                  {busy ? t('workshop.generating') : t(descKey)}
+                </span>
+              </button>
+
+              {/* Customize: opens the options panel instead of the one-click default */}
+              <button
+                type="button"
+                onClick={() => setCustomizeFeature(feature)}
+                title={t('workshop.customize')}
+                aria-label={t('workshop.customize')}
+                className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </div>
           )
         })}
       </div>
+
+      <GenerationOptionsPanel
+        feature={customizeFeature}
+        open={Boolean(customizeFeature)}
+        onOpenChange={(o) => {
+          if (!o) setCustomizeFeature(null)
+        }}
+        onGenerate={(opts) => {
+          if (customizeFeature) run(customizeFeature, customizeTitleKey, opts)
+        }}
+      />
     </div>
   )
 }

@@ -113,6 +113,7 @@ async def generate_data_table(
         "source_ids": [str(s.id) for s in sources],
         "steering_prompt": steering_prompt,
         "language": language,
+        "options": {},
     }
 
     title = f"Data Table — {notebook_title}" if notebook_title else "Data Table"
