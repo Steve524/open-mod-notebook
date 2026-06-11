@@ -20,6 +20,7 @@ async def get_settings():
             default_embedding_option=settings.default_embedding_option,
             auto_delete_files=settings.auto_delete_files,
             youtube_preferred_languages=settings.youtube_preferred_languages,
+            default_vault_sync_mode=settings.default_vault_sync_mode,
         )
     except Exception as e:
         logger.error(f"Error fetching settings: {str(e)}")
@@ -67,6 +68,12 @@ async def update_settings(settings_update: SettingsUpdate):
             settings.youtube_preferred_languages = (
                 settings_update.youtube_preferred_languages
             )
+        if settings_update.default_vault_sync_mode is not None:
+            from typing import Literal, cast
+
+            settings.default_vault_sync_mode = cast(
+                Literal["manual", "live"], settings_update.default_vault_sync_mode
+            )
 
         await settings.update()
 
@@ -76,6 +83,7 @@ async def update_settings(settings_update: SettingsUpdate):
             default_embedding_option=settings.default_embedding_option,
             auto_delete_files=settings.auto_delete_files,
             youtube_preferred_languages=settings.youtube_preferred_languages,
+            default_vault_sync_mode=settings.default_vault_sync_mode,
         )
     except HTTPException:
         raise

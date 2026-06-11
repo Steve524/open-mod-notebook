@@ -61,6 +61,7 @@ export interface SettingsResponse {
   default_embedding_option?: string
   auto_delete_files?: string
   youtube_preferred_languages?: string[]
+  default_vault_sync_mode?: string
 }
 
 export interface CreateNotebookRequest {

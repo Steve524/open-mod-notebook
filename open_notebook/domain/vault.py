@@ -128,3 +128,38 @@ class VaultFileState(ObjectModel):
             {"c": ensure_record_id(connection_id)},
         )
         return [cls(**r) for r in rows] if rows else []
+
+
+async def global_vault_sync_mode() -> str:
+    """Read the global default vault sync mode straight from the DB.
+
+    Deliberately bypasses ``ContentSettings.get_instance()``: that singleton is
+    cached per-process with no invalidation, so the worker process would never
+    see a Settings change made by the API process until it restarted.
+    """
+    try:
+        rows = await repo_query(
+            "SELECT default_vault_sync_mode FROM ONLY $id",
+            {"id": ensure_record_id("open_notebook:content_settings")},
+        )
+        if isinstance(rows, dict):
+            return rows.get("default_vault_sync_mode") or "manual"
+        if isinstance(rows, list) and rows:
+            return rows[0].get("default_vault_sync_mode") or "manual"
+    except Exception:
+        pass
+    return "manual"
+
+
+async def effective_is_live(conn: "VaultConnection") -> bool:
+    """Resolve a connection's effective sync mode to a boolean.
+
+    Per-connection override wins; ``inherit`` falls back to the global
+    ``default_vault_sync_mode``. Shared by the sync command and (Phase 5) the
+    watcher manager so both agree on what "live" means.
+    """
+    if conn.sync_mode == "live":
+        return True
+    if conn.sync_mode == "manual":
+        return False
+    return await global_vault_sync_mode() == "live"

@@ -777,6 +777,13 @@ export const enUS = {
     autoDeletePlaceholder: "Select auto delete option",
     filesHelp: "Once your files are uploaded and processed, they are not required anymore. Most users should allow Open Notebook to delete uploaded files from the upload folder automatically.",
     loadFailed: "Failed to load settings",
+    vaultSync: "Vault sync",
+    vaultSyncDesc: "How connected folders (e.g. Obsidian vaults) stay in sync. Applies to every vault set to \"Inherit\".",
+    vaultSyncMode: "Sync mode",
+    vaultSyncModePlaceholder: "Select sync mode",
+    vaultSyncManual: "On request (manual refresh)",
+    vaultSyncLive: "Live watch (auto-sync on change)",
+    vaultSyncHelp: "Manual is the default — vaults update when you press Refresh. Live watch auto-syncs when files change; it needs the server running and (in Docker) the vault bind-mounted. A vault's own mode override takes precedence over this.",
   },
   advanced: {
     title: "AdvancedTools",

@@ -21,6 +21,7 @@ from open_notebook.domain.vault import (
     VaultConnection,
     VaultFileState,
     VaultSubscription,
+    effective_is_live,
 )
 from open_notebook.exceptions import ConfigurationError
 
@@ -223,7 +224,7 @@ async def sync_vault_command(input_data: SyncVaultInput) -> SyncVaultOutput:
         conn.stats = stats
         conn.last_synced_at = datetime.now()
         conn.last_error = None
-        conn.status = "watching" if _effective_live(conn) else "idle"
+        conn.status = "watching" if await effective_is_live(conn) else "idle"
         await conn.save()
 
         logger.info(
@@ -258,9 +259,3 @@ async def sync_vault_command(input_data: SyncVaultInput) -> SyncVaultOutput:
         await conn.save()
         logger.debug(f"sync_vault transient error for {conn.id}: {e}")
         raise
-
-
-def _effective_live(conn: VaultConnection) -> bool:
-    """True if this connection's effective mode is live (per-connection override
-    only; the global-setting fallback is resolved by the watcher manager)."""
-    return conn.sync_mode == "live"

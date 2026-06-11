@@ -23,3 +23,7 @@ class ContentSettings(RecordModel):
         ["en", "pt", "es", "de", "nl", "en-GB", "fr", "de", "hi", "ja"],
         description="Preferred languages for YouTube transcripts",
     )
+    default_vault_sync_mode: Optional[Literal["manual", "live"]] = Field(
+        "manual",
+        description="Global default sync mode for vault connections set to 'inherit'",
+    )

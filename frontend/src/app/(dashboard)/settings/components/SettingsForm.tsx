@@ -20,6 +20,7 @@ const settingsSchema = z.object({
   default_content_processing_engine_url: z.enum(['auto', 'firecrawl', 'jina', 'simple']).optional(),
   default_embedding_option: z.enum(['ask', 'always', 'never']).optional(),
   auto_delete_files: z.enum(['yes', 'no']).optional(),
+  default_vault_sync_mode: z.enum(['manual', 'live']).optional(),
 })
 
 type SettingsFormData = z.infer<typeof settingsSchema>
@@ -49,6 +50,7 @@ export function SettingsForm() {
       default_content_processing_engine_url: undefined,
       default_embedding_option: undefined,
       auto_delete_files: undefined,
+      default_vault_sync_mode: undefined,
     }
   })
 
@@ -64,6 +66,7 @@ export function SettingsForm() {
         default_content_processing_engine_url: settings.default_content_processing_engine_url as 'auto' | 'firecrawl' | 'jina' | 'simple',
         default_embedding_option: settings.default_embedding_option as 'ask' | 'always' | 'never',
         auto_delete_files: settings.auto_delete_files as 'yes' | 'no',
+        default_vault_sync_mode: (settings.default_vault_sync_mode as 'manual' | 'live') || 'manual',
       }
       reset(formData)
       setHasResetForm(true)
@@ -265,9 +268,45 @@ export function SettingsForm() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('settings.vaultSync')}</CardTitle>
+          <CardDescription>
+            {t('settings.vaultSyncDesc')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-3">
+            <Label htmlFor="vault_sync_mode">{t('settings.vaultSyncMode')}</Label>
+            <Controller
+              name="default_vault_sync_mode"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  key={field.value}
+                  name={field.name}
+                  value={field.value || ''}
+                  onValueChange={field.onChange}
+                  disabled={field.disabled || isLoading}
+                >
+                  <SelectTrigger id="vault_sync_mode" className="w-full">
+                    <SelectValue placeholder={t('settings.vaultSyncModePlaceholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">{t('settings.vaultSyncManual')}</SelectItem>
+                    <SelectItem value="live">{t('settings.vaultSyncLive')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <p className="text-sm text-muted-foreground">{t('settings.vaultSyncHelp')}</p>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex justify-end">
-         <Button 
-          type="submit" 
+         <Button
+          type="submit"
           disabled={!isDirty || updateSettings.isPending}
         >
           {updateSettings.isPending ? t('common.saving') : t('common.save')}

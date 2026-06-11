@@ -264,6 +264,7 @@ class SettingsResponse(BaseModel):
     default_embedding_option: Optional[str] = None
     auto_delete_files: Optional[str] = None
     youtube_preferred_languages: Optional[List[str]] = None
+    default_vault_sync_mode: Optional[str] = None
 
 
 class SettingsUpdate(BaseModel):
@@ -272,6 +273,7 @@ class SettingsUpdate(BaseModel):
     default_embedding_option: Optional[str] = None
     auto_delete_files: Optional[str] = None
     youtube_preferred_languages: Optional[List[str]] = None
+    default_vault_sync_mode: Optional[str] = None
 
 
 # Sources API models
