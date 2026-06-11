@@ -14,6 +14,7 @@ from typing import List, Optional
 
 import pathspec
 from loguru import logger
+from pydantic import BaseModel
 from surreal_commands import CommandInput, CommandOutput, command, submit_command
 
 from open_notebook.domain.notebook import Asset, Source
@@ -26,9 +27,17 @@ from open_notebook.domain.vault import (
 from open_notebook.exceptions import ConfigurationError
 
 
+class MoveOp(BaseModel):
+    """A file rename detected by the live watcher (same content, new path)."""
+
+    from_rel: str
+    to_rel: str
+
+
 class SyncVaultInput(CommandInput):
     connection_id: str
     rel_paths: Optional[List[str]] = None  # present = targeted pass (live watch)
+    moves: Optional[List[MoveOp]] = None  # explicit renames (no re-embed)
 
 
 class SyncVaultOutput(CommandOutput):
@@ -123,14 +132,17 @@ async def sync_vault_command(input_data: SyncVaultInput) -> SyncVaultOutput:
     if not conn:
         raise ValueError(f"Vault connection '{input_data.connection_id}' not found")
 
-    # Per-connection lock: a scan in progress collapses queued refreshes.
-    if not input_data.rel_paths and conn.status == "scanning":
+    # A targeted pass names specific files (live watch); absent = full scan.
+    is_targeted = bool(input_data.rel_paths) or bool(input_data.moves)
+
+    # Per-connection lock: a full scan in progress collapses queued refreshes.
+    if not is_targeted and conn.status == "scanning":
         logger.info(f"Vault {conn.id} already scanning; collapsing this refresh")
         return SyncVaultOutput(success=True, connection_id=str(conn.id))
 
     run_start = datetime.now()
     stats = {"added": 0, "updated": 0, "removed": 0, "skipped": 0, "files": 0}
-    if not input_data.rel_paths:
+    if not is_targeted:
         conn.status = "scanning"
         conn.last_error = None
         await conn.save()
@@ -146,8 +158,39 @@ async def sync_vault_command(input_data: SyncVaultInput) -> SyncVaultOutput:
 
         existing = {fs.rel_path: fs for fs in await VaultFileState.for_connection(str(conn.id))}
 
+        # Apply explicit renames first: re-key the file_state and re-title the
+        # Source in place. Same content, so we never re-process or re-embed.
+        if input_data.moves:
+            for mv in input_data.moves:
+                prev = existing.get(mv.from_rel)
+                if prev is None:
+                    continue  # unknown source; the dest is handled as a normal add
+                new_abs = os.path.join(conn.root_path, mv.to_rel.replace("/", os.sep))
+                try:
+                    source = await Source.get(str(prev.source))
+                    if source.asset:
+                        source.asset.file_path = new_abs
+                    else:
+                        source.asset = Asset(file_path=new_abs)
+                    source.title = _file_title(mv.to_rel)
+                    await source.save()
+                except Exception as e:
+                    logger.warning(f"Vault move: source {prev.source} re-title: {e}")
+                del existing[mv.from_rel]
+                prev.rel_path = mv.to_rel
+                try:
+                    st = os.stat(new_abs)
+                    prev.mtime = st.st_mtime
+                    prev.size = st.st_size
+                except OSError:
+                    pass
+                prev.last_seen_at = datetime.now()
+                await prev.save()
+                existing[mv.to_rel] = prev
+                stats["updated"] += 1
+
         # Restrict the walk to specific files for a targeted (live) pass.
-        targeted = set(input_data.rel_paths) if input_data.rel_paths else None
+        targeted = set(input_data.rel_paths or []) if is_targeted else None
 
         seen: set[str] = set()
         for rel_path, abs_path in _iter_files(conn.root_path, include, exclude):
@@ -207,18 +250,24 @@ async def sync_vault_command(input_data: SyncVaultInput) -> SyncVaultOutput:
                 await prev.save()
                 stats["skipped"] += 1
 
-        # DELETE: rows not seen this run (full scan only).
+        # DELETE: a full scan removes every unseen row; a targeted pass only
+        # removes the explicitly-named paths that are now missing on disk.
         if targeted is None:
-            for rel_path, fs in existing.items():
-                if rel_path in seen:
-                    continue
-                try:
-                    source = await Source.get(str(fs.source))
-                    await _vault_safe_delete(source)
-                except Exception as e:
-                    logger.warning(f"Vault delete: source {fs.source} cleanup: {e}")
-                await fs.delete()
-                stats["removed"] += 1
+            to_delete = [(rp, fs) for rp, fs in existing.items() if rp not in seen]
+        else:
+            to_delete = [
+                (rp, fs)
+                for rp, fs in existing.items()
+                if rp in targeted and rp not in seen
+            ]
+        for rel_path, fs in to_delete:
+            try:
+                source = await Source.get(str(fs.source))
+                await _vault_safe_delete(source)
+            except Exception as e:
+                logger.warning(f"Vault delete: source {fs.source} cleanup: {e}")
+            await fs.delete()
+            stats["removed"] += 1
 
         # Finalize connection state.
         conn.stats = stats

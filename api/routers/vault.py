@@ -27,8 +27,17 @@ from open_notebook.domain.vault import (
 
 # Import so the sync_vault command is registered in the API process registry.
 import commands.vault_commands  # noqa: F401
+from api.vault_watcher import get_vault_watcher
 
 router = APIRouter()
+
+
+async def _reconcile_watchers() -> None:
+    """Re-sync live-mode observers after a change that may affect them."""
+    try:
+        await get_vault_watcher().reconcile()
+    except Exception as e:  # never let watcher upkeep break an API call
+        logger.warning(f"Vault watcher reconcile failed: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +196,7 @@ async def create_connection(body: VaultConnectionCreate):
     _require_allowed(body.root_path)
     conn = _apply_create(body)
     await conn.save()
+    await _reconcile_watchers()
     return _conn_response(conn, 0, 0)
 
 
@@ -208,6 +218,7 @@ async def update_connection(connection_id: str, body: VaultConnectionUpdate):
         if val is not None:
             setattr(conn, field, val)
     await conn.save()
+    await _reconcile_watchers()  # mode/path change may start/stop a watcher
     sc, fc = await _counts(connection_id)
     return _conn_response(conn, sc, fc)
 
@@ -232,6 +243,7 @@ async def remove_link(connection_id: str, purge_sources: bool = Query(False)):
     for sub in await VaultSubscription.for_connection(connection_id):
         await sub.delete()
     await conn.delete()
+    await get_vault_watcher().stop_connection(connection_id)
     return {"deleted": True, "purged_sources": purged}
 
 
@@ -320,6 +332,7 @@ async def link_vault(notebook_id: str, body: VaultConnectionCreate):
     sub = VaultSubscription(notebook=notebook_id, connection=str(conn.id))
     await sub.save()
     submit_command("open_notebook", "sync_vault", {"connection_id": str(conn.id)})
+    await _reconcile_watchers()
     return _conn_response(conn, 1, 0)
 
 
@@ -364,6 +377,25 @@ async def connection_status(connection_id: str):
         "last_error": conn.last_error,
         "stats": conn.stats,
     }
+
+
+# ---------------------------------------------------------------------------
+# Live-watch lifecycle (effective only when mode resolves to live)
+# ---------------------------------------------------------------------------
+@router.post("/vault-connections/{connection_id}/watch/start")
+async def watch_start(connection_id: str):
+    """Start watching this connection if its effective mode is live."""
+    await VaultConnection.get(connection_id)  # 404 if missing
+    await _reconcile_watchers()
+    return get_vault_watcher().status()
+
+
+@router.post("/vault-connections/{connection_id}/watch/stop")
+async def watch_stop(connection_id: str):
+    """Stop watching this connection until the next reconcile."""
+    await VaultConnection.get(connection_id)  # 404 if missing
+    await get_vault_watcher().stop_connection(connection_id)
+    return get_vault_watcher().status()
 
 
 # ---------------------------------------------------------------------------

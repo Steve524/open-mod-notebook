@@ -147,12 +147,28 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Podcast profile migration encountered errors: {e}")
         # Non-fatal: profiles can be migrated manually via UI
 
+    # Start vault filesystem watchers for live-mode connections.
+    try:
+        from api.vault_watcher import get_vault_watcher
+
+        await get_vault_watcher().start()
+    except Exception as e:
+        logger.warning(f"Vault watcher failed to start: {e}")
+        # Non-fatal: manual refresh still works
+
     logger.success("API initialization completed successfully")
 
     # Yield control to the application
     yield
 
-    # Shutdown: cleanup if needed
+    # Shutdown: stop vault watchers
+    try:
+        from api.vault_watcher import get_vault_watcher
+
+        await get_vault_watcher().stop()
+    except Exception as e:
+        logger.warning(f"Vault watcher stop error: {e}")
+
     logger.info("API shutdown complete")
 
 

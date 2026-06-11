@@ -77,6 +77,16 @@ async def update_settings(settings_update: SettingsUpdate):
 
         await settings.update()
 
+        # A change to the global vault sync mode may start/stop watchers for
+        # every connection left on "inherit".
+        if settings_update.default_vault_sync_mode is not None:
+            try:
+                from api.vault_watcher import get_vault_watcher
+
+                await get_vault_watcher().reconcile()
+            except Exception as e:
+                logger.warning(f"Vault watcher reconcile after settings update failed: {e}")
+
         return SettingsResponse(
             default_content_processing_engine_doc=settings.default_content_processing_engine_doc,
             default_content_processing_engine_url=settings.default_content_processing_engine_url,
