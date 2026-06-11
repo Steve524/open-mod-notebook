@@ -985,6 +985,7 @@ export const enUS = {
     validateNotFound: "Path not found on the server.",
     validateNotDir: "Path is not a directory.",
     validateNotReadable: "Path is not readable by the server.",
+    validateLarge: "Large vault — consider tightening the include/exclude globs. The first sync may take a while.",
     includeLabel: "Include (one glob per line)",
     excludeLabel: "Exclude (one glob per line)",
     embedLabel: "Embed for semantic search",

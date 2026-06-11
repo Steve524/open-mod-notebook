@@ -43,6 +43,10 @@ interface AddVaultDialogProps {
   onSuccess?: () => void
 }
 
+// Above this many markdown files, suggest tightening globs — the first sync
+// (and any live rescan) gets noticeably heavier.
+const LARGE_VAULT_THRESHOLD = 2000
+
 const linesToGlobs = (text: string): string[] =>
   text
     .split('\n')
@@ -219,6 +223,12 @@ export function AddVaultDialog({
                           <p className="font-mono truncate opacity-70">
                             {validation.sample.slice(0, 3).join(', ')}
                             {validation.file_count_estimate > 3 ? ' …' : ''}
+                          </p>
+                        )}
+                        {validation.file_count_estimate >= LARGE_VAULT_THRESHOLD && (
+                          <p className="mt-1 flex items-start gap-1 italic">
+                            <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
+                            {t('vault.validateLarge')}
                           </p>
                         )}
                       </>

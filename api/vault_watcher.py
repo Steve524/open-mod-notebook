@@ -5,8 +5,14 @@ Observer watches each effectively-live connection's folder; events are
 debounced per connection and turned into a targeted ``sync_vault`` job. The
 **worker** does all extraction/embedding — the watcher only detects + submits.
 
-Set ``OPEN_NOTEBOOK_VAULT_WATCHER=off`` to disable (e.g. when running multiple
-API replicas, so only one process owns the watchers).
+``OPEN_NOTEBOOK_VAULT_WATCHER`` controls it:
+- unset / anything else → native Observer (inotify on Linux).
+- ``poll`` → PollingObserver. Use this when the vault is bind-mounted from a
+  Windows/macOS host into Docker: inotify events often don't cross that
+  boundary, so native watching silently sees nothing. Polling always works
+  (at the cost of a periodic rescan).
+- ``off`` → disabled (e.g. when running multiple API replicas so only one
+  process owns the watchers; the others rely on manual/scheduled refresh).
 """
 
 import os
@@ -155,9 +161,8 @@ class VaultWatcherManager:
         self._observer: Optional[Observer] = None
         self._watches: Dict[str, dict] = {}  # connection_id -> {watch, handler, root}
         self._lock = threading.Lock()
-        self._enabled = (
-            os.environ.get("OPEN_NOTEBOOK_VAULT_WATCHER", "").lower() != "off"
-        )
+        self._mode = os.environ.get("OPEN_NOTEBOOK_VAULT_WATCHER", "").strip().lower()
+        self._enabled = self._mode != "off"
 
     @property
     def enabled(self) -> bool:
@@ -206,7 +211,13 @@ class VaultWatcherManager:
 
     def _ensure_observer(self):
         if self._observer is None:
-            self._observer = Observer()
+            if self._mode in ("poll", "polling"):
+                from watchdog.observers.polling import PollingObserver
+
+                self._observer = PollingObserver()
+                logger.info("Vault watcher using PollingObserver (bind-mount safe)")
+            else:
+                self._observer = Observer()
             self._observer.start()
 
     def _start_locked(self, conn: VaultConnection):

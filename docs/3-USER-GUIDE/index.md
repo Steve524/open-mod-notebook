@@ -25,6 +25,8 @@ How to bring content into your notebook. Supports PDFs, web links, audio, video,
 - Paste text directly
 - Common mistakes + fixes
 
+> Want to sync a whole folder (e.g. an **Obsidian vault**) instead of adding files one at a time? See [Vault Sync](vault-sync.md).
+
 ---
 
 ### 2. [Working with Notes](working-with-notes.md)
