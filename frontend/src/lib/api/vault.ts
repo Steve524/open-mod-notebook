@@ -7,6 +7,7 @@ import {
   RemoveVaultResponse,
   ValidatePathResponse,
   VaultJobResponse,
+  BrowseResponse,
 } from '@/lib/types/vault'
 
 export const vaultApi = {
@@ -50,6 +51,13 @@ export const vaultApi = {
   validatePath: async (root_path: string) => {
     const response = await apiClient.post<ValidatePathResponse>('/vault/validate-path', {
       root_path,
+    })
+    return response.data
+  },
+
+  browse: async (path?: string) => {
+    const response = await apiClient.get<BrowseResponse>('/vault/browse', {
+      params: path ? { path } : undefined,
     })
     return response.data
   },

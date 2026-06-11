@@ -74,6 +74,19 @@ export interface VaultJobResponse {
   status: string
 }
 
+export interface BrowseEntry {
+  name: string
+  path: string
+  md_count: number
+}
+
+export interface BrowseResponse {
+  path: string
+  parent: string | null
+  allowed: boolean
+  entries: BrowseEntry[]
+}
+
 export const DEFAULT_INCLUDE_GLOBS = ['**/*.md']
 export const DEFAULT_EXCLUDE_GLOBS = [
   '.obsidian/**',

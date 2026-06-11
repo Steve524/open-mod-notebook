@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import {
   FolderGit2,
+  FolderSearch,
   Loader2,
   CheckCircle2,
   AlertTriangle,
@@ -24,6 +25,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { vaultApi } from '@/lib/api/vault'
+import { FolderBrowserDialog } from '@/components/vault/FolderBrowserDialog'
 import {
   useVaultConnections,
   useLinkVault,
@@ -69,6 +71,7 @@ export function AddVaultDialog({
   const [embed, setEmbed] = useState(true)
   const [validation, setValidation] = useState<ValidatePathResponse | null>(null)
   const [isValidating, setIsValidating] = useState(false)
+  const [browserOpen, setBrowserOpen] = useState(false)
 
   // Subscribe state
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null)
@@ -141,6 +144,7 @@ export function AddVaultDialog({
     validation && validation.exists && validation.is_dir && validation.readable && validation.allowed
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(o) : resetAndClose())}>
       <DialogContent className="max-w-2xl sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
@@ -182,6 +186,14 @@ export function AddVaultDialog({
                   placeholder="/vaults/MyVault"
                   className="font-mono text-sm"
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setBrowserOpen(true)}
+                  title={t('vault.browse')}
+                >
+                  <FolderSearch className="h-4 w-4" />
+                </Button>
                 <Button
                   type="button"
                   variant="outline"
@@ -368,5 +380,16 @@ export function AddVaultDialog({
         </Tabs>
       </DialogContent>
     </Dialog>
+
+    <FolderBrowserDialog
+      open={browserOpen}
+      onOpenChange={setBrowserOpen}
+      initialPath={rootPath.trim() || undefined}
+      onSelect={(p) => {
+        setRootPath(p)
+        setValidation(null)
+      }}
+    />
+    </>
   )
 }

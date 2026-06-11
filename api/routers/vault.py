@@ -109,6 +109,19 @@ class VaultJobResponse(BaseModel):
     status: str = "submitted"
 
 
+class BrowseEntry(BaseModel):
+    name: str
+    path: str
+    md_count: int = 0  # shallow count of direct .md children (a "this is a vault" hint)
+
+
+class BrowseResponse(BaseModel):
+    path: str
+    parent: Optional[str] = None  # None when at the allowlist/filesystem root
+    allowed: bool = True
+    entries: List[BrowseEntry]
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -136,6 +149,32 @@ def _require_allowed(root_path: str) -> None:
             status_code=400,
             detail="Path is outside the allowed vaults base directory (OPEN_NOTEBOOK_VAULTS_BASE_DIR)",
         )
+
+
+def _default_browse_root() -> str:
+    """Where the folder browser starts when no path is given."""
+    base = _allowed_base()
+    if base:
+        return os.path.realpath(base)
+    for candidate in ("/vaults", os.path.expanduser("~")):
+        if candidate and os.path.isdir(candidate):
+            return os.path.realpath(candidate)
+    return os.path.realpath(os.sep)
+
+
+def _shallow_md_count(directory: str, cap: int = 200) -> int:
+    """Count direct .md children (cheap hint; not recursive)."""
+    count = 0
+    try:
+        with os.scandir(directory) as it:
+            for entry in it:
+                if entry.name.lower().endswith(".md") and entry.is_file():
+                    count += 1
+                    if count >= cap:
+                        break
+    except OSError:
+        return 0
+    return count
 
 
 async def _counts(connection_id: str) -> tuple[int, int]:
@@ -432,4 +471,47 @@ async def validate_path(body: ValidatePathRequest):
         allowed=allowed,
         file_count_estimate=count,
         sample=sample,
+    )
+
+
+@router.get("/vault/browse", response_model=BrowseResponse)
+async def browse(path: Optional[str] = Query(None)):
+    """List sub-directories so the UI can browse the SERVER's filesystem.
+
+    The server reads the vault, so users pick a folder the server can see
+    (in Docker, that's the in-container path). Honors the optional
+    OPEN_NOTEBOOK_VAULTS_BASE_DIR allowlist as a hard navigation boundary.
+    """
+    base = _allowed_base()
+    target = os.path.realpath(path.strip()) if path and path.strip() else _default_browse_root()
+
+    if not os.path.isdir(target):
+        raise HTTPException(status_code=400, detail="Not a directory")
+    # Confine navigation to the allowlist when one is configured.
+    if base and not _is_allowed(target):
+        target = os.path.realpath(base)
+
+    parent: Optional[str] = os.path.dirname(target)
+    if parent == target:  # filesystem root
+        parent = None
+    elif base and os.path.realpath(target) == os.path.realpath(base):
+        parent = None  # don't let the user climb above the allowlist root
+    elif base and parent and not _is_allowed(parent):
+        parent = os.path.realpath(base)
+
+    entries: List[BrowseEntry] = []
+    try:
+        for name in sorted(os.listdir(target), key=str.lower):
+            if name.startswith("."):  # skip hidden dirs (.obsidian, .git, .trash …)
+                continue
+            full = os.path.join(target, name)
+            if os.path.isdir(full):
+                entries.append(
+                    BrowseEntry(name=name, path=full, md_count=_shallow_md_count(full))
+                )
+    except PermissionError:
+        raise HTTPException(status_code=400, detail="Permission denied reading directory")
+
+    return BrowseResponse(
+        path=target, parent=parent, allowed=_is_allowed(target), entries=entries
     )
