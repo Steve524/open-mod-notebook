@@ -78,6 +78,9 @@ services:
       # ---------------------------------------------------------------------
       - OPEN_NOTEBOOK_VAULTS_BASE_DIR=/host
       - OPEN_NOTEBOOK_VAULT_WATCHER=poll
+      # The real host path /host maps to, so the UI can show & accept familiar
+      # paths (e.g. C:\Users\you\Documents\Vault) instead of /host/... .
+      - OPEN_NOTEBOOK_VAULTS_HOST_LABEL=${VAULTS_HOST_DIR:-}
     volumes:
       - ./notebook_data:/app/data   # Persistent user data (notebooks, uploads)
       # Your host folder, browsable in-app at /host (read-only — sync only reads).

@@ -118,8 +118,9 @@ class BrowseEntry(BaseModel):
 
 
 class BrowseResponse(BaseModel):
-    path: str
+    path: str  # in-container path (sent back for navigation)
     parent: Optional[str] = None  # None when at the allowlist/filesystem root
+    display_path: str = ""  # host-facing path for showing to the user
     allowed: bool = True
     entries: List[BrowseEntry]
 
@@ -164,6 +165,68 @@ def _default_browse_root() -> str:
     return os.path.realpath(os.sep)
 
 
+def _host_label() -> Optional[str]:
+    """The real host path that the in-container base dir is mounted from.
+
+    Lets the UI show/accept native paths (e.g. ``C:\\Users\\you\\Vault``)
+    instead of ``/host/...``. Empty when unset, in which case mapping is a no-op.
+    """
+    label = os.environ.get("OPEN_NOTEBOOK_VAULTS_HOST_LABEL")
+    label = label.strip() if label else ""
+    return label.rstrip("/\\") or None
+
+
+def _to_container(path: Optional[str]) -> Optional[str]:
+    """Translate a user-supplied host path into the in-container path.
+
+    Accepts either a real host path (under the host label) or an already-
+    container path (under the base dir). Slash- and case-insensitive so Windows
+    paths like ``C:\\Users\\me\\Vault`` resolve to ``/host/Vault``.
+    """
+    if not path:
+        return path
+    norm = path.replace("\\", "/").rstrip("/")
+    base = _allowed_base()
+    if base:
+        base_norm = base.replace("\\", "/").rstrip("/")
+        if norm.lower() == base_norm.lower() or norm.lower().startswith(
+            base_norm.lower() + "/"
+        ):
+            return norm  # already a container path
+    label = _host_label()
+    if label and base:
+        label_norm = label.replace("\\", "/").rstrip("/")
+        base_c = base.rstrip("/")
+        if norm.lower() == label_norm.lower():
+            return base_c
+        if norm.lower().startswith(label_norm.lower() + "/"):
+            rel = norm[len(label_norm):].lstrip("/")
+            return f"{base_c}/{rel}" if rel else base_c
+    return norm
+
+
+def _to_display(container_path: Optional[str]) -> Optional[str]:
+    """Translate an in-container path back to the host-facing path for display."""
+    if not container_path:
+        return container_path
+    base = _allowed_base()
+    label = _host_label()
+    if not base or not label:
+        return container_path
+    base_norm = base.replace("\\", "/").rstrip("/")
+    cont_norm = container_path.replace("\\", "/").rstrip("/")
+    if cont_norm.lower() != base_norm.lower() and not cont_norm.lower().startswith(
+        base_norm.lower() + "/"
+    ):
+        return container_path
+    rel = cont_norm[len(base_norm):].lstrip("/")
+    if ":" in label:  # Windows-style host label -> backslashes
+        disp = label.replace("/", "\\").rstrip("\\")
+        return f"{disp}\\{rel.replace('/', chr(92))}" if rel else disp
+    disp = label.rstrip("/")
+    return f"{disp}/{rel}" if rel else disp
+
+
 def _shallow_doc_count(directory: str, cap: int = 200) -> int:
     """Count direct ingestable children (cheap hint; not recursive)."""
     count = 0
@@ -191,7 +254,7 @@ def _conn_response(
     return VaultConnectionResponse(
         id=str(conn.id or ""),
         name=conn.name,
-        root_path=conn.root_path,
+        root_path=_to_display(conn.root_path) or conn.root_path,
         sync_mode=conn.sync_mode,
         include_globs=conn.include_globs,
         exclude_globs=conn.exclude_globs,
@@ -234,6 +297,7 @@ async def list_connections():
 
 @router.post("/vault-connections", response_model=VaultConnectionResponse)
 async def create_connection(body: VaultConnectionCreate):
+    body.root_path = _to_container(body.root_path)
     _require_allowed(body.root_path)
     conn = _apply_create(body)
     await conn.save()
@@ -245,6 +309,7 @@ async def create_connection(body: VaultConnectionCreate):
 async def update_connection(connection_id: str, body: VaultConnectionUpdate):
     conn = await VaultConnection.get(connection_id)
     if body.root_path is not None:
+        body.root_path = _to_container(body.root_path)
         _require_allowed(body.root_path)
     for field in (
         "name",
@@ -367,6 +432,7 @@ async def unsubscribe(notebook_id: str, subscription_id: str):
 @router.post("/notebooks/{notebook_id}/vault/link", response_model=VaultConnectionResponse)
 async def link_vault(notebook_id: str, body: VaultConnectionCreate):
     """Create a connection, subscribe this notebook, and kick off the first sync."""
+    body.root_path = _to_container(body.root_path)
     _require_allowed(body.root_path)
     conn = _apply_create(body)
     await conn.save()
@@ -464,6 +530,7 @@ async def supported_extensions():
 
 @router.post("/vault/validate-path", response_model=ValidatePathResponse)
 async def validate_path(body: ValidatePathRequest):
+    body.root_path = _to_container(body.root_path) or body.root_path
     p = Path(body.root_path)
     exists = p.exists()
     is_dir = p.is_dir()
@@ -505,7 +572,8 @@ async def browse(path: Optional[str] = Query(None)):
     OPEN_NOTEBOOK_VAULTS_BASE_DIR allowlist as a hard navigation boundary.
     """
     base = _allowed_base()
-    target = os.path.realpath(path.strip()) if path and path.strip() else _default_browse_root()
+    requested = _to_container(path.strip()) if path and path.strip() else None
+    target = os.path.realpath(requested) if requested else _default_browse_root()
 
     if not os.path.isdir(target):
         raise HTTPException(status_code=400, detail="Not a directory")
@@ -535,5 +603,9 @@ async def browse(path: Optional[str] = Query(None)):
         raise HTTPException(status_code=400, detail="Permission denied reading directory")
 
     return BrowseResponse(
-        path=target, parent=parent, allowed=_is_allowed(target), entries=entries
+        path=target,
+        parent=parent,
+        display_path=_to_display(target) or target,
+        allowed=_is_allowed(target),
+        entries=entries,
     )

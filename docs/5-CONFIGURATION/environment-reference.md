@@ -57,6 +57,7 @@ Comprehensive list of all environment variables available in Open Notebook.
 |----------|-----------|---------|-------------|
 | `OPEN_NOTEBOOK_VAULT_WATCHER` | No | (native) | Live-watch filesystem backend. Unset/any value = native watcher (inotify on Linux). `poll` = polling watcher (use when the vault is **bind-mounted from a Windows/macOS host** into Docker, where inotify events don't propagate). `off` = disable live watch entirely (e.g. when running multiple API replicas, so only one owns the watchers). |
 | `OPEN_NOTEBOOK_VAULTS_BASE_DIR` | No | None | If set, vault folder paths are restricted to this directory (an allowlist). Connection create/update and path validation reject paths outside it. Leave unset to allow any server-visible path. |
+| `OPEN_NOTEBOOK_VAULTS_HOST_LABEL` | No | None | The real host path that the base dir is mounted from (e.g. `C:/Users/you`). When set, the UI shows and accepts native host paths (e.g. `C:\Users\you\Documents\Vault`) instead of in-container `/host/...` paths. In `docker-compose.local.yml` this is wired to `VAULTS_HOST_DIR` automatically. |
 
 > Live watch only applies to vaults whose effective sync mode is **Live** (set per-vault, or globally in Settings → Vault sync for vaults left on "Inherit"). See the [Vault Sync user guide](../3-USER-GUIDE/vault-sync.md).
 

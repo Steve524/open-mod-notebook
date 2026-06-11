@@ -83,6 +83,7 @@ export interface BrowseEntry {
 export interface BrowseResponse {
   path: string
   parent: string | null
+  display_path: string
   allowed: boolean
   entries: BrowseEntry[]
 }

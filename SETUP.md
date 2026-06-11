@@ -111,21 +111,40 @@ Link a folder on your machine so its documents become searchable sources, kept
 in sync as you edit. **The server reads the folder, not the browser**, so the
 folder is exposed to the container via a read-only bind mount.
 
-1. Set `VAULTS_HOST_DIR` in `.env` to the **parent** of your vaults (see the
-   per-OS examples above), then start/rebuild:
+1. Set `VAULTS_HOST_DIR` in `.env` to a folder that **contains all the vaults
+   you'll ever want to link** — everything under it becomes browsable. Your
+   **user profile** is the usual choice (it covers `Documents`, `Desktop`, etc.);
+   use a whole drive for maximum reach:
+
+   - Windows: `VAULTS_HOST_DIR=C:/Users/YOUR_USERNAME` (or `C:/` for the whole drive)
+   - macOS: `VAULTS_HOST_DIR=/Users/YOUR_USERNAME`
+   - Linux: `VAULTS_HOST_DIR=/home/YOUR_USERNAME`
+
+   Then start/rebuild:
 
    ```bash
    docker compose -f docker-compose.local.yml up --build -d
    ```
 
-   `docker-compose.local.yml` mounts `VAULTS_HOST_DIR` at `/host` (read-only)
-   and sets `OPEN_NOTEBOOK_VAULTS_BASE_DIR=/host` — so the app can browse only
-   what's under that folder — plus `OPEN_NOTEBOOK_VAULT_WATCHER=poll` so live
-   sync works across the bind mount on Windows/macOS.
+   `docker-compose.local.yml` mounts `VAULTS_HOST_DIR` at `/host` (read-only),
+   sets `OPEN_NOTEBOOK_VAULTS_BASE_DIR=/host` (the app can only see what's under
+   that folder), `OPEN_NOTEBOOK_VAULT_WATCHER=poll` (live sync across the bind
+   mount on Windows/macOS), and `OPEN_NOTEBOOK_VAULTS_HOST_LABEL` (so the UI
+   shows your real paths, e.g. `C:\Users\you\Documents\Vault`).
+
+   > **Docker Desktop file sharing:** the drive holding `VAULTS_HOST_DIR` must be
+   > shared with Docker (Settings → Resources → File sharing; the WSL2 backend
+   > shares your drives by default). If browsing shows nothing, this is usually why.
 
 2. In the app, open a notebook → **Sources → Connect a vault → Link new →
-   Browse**. The browser starts at `/host`; click through to any subfolder and
-   choose **Use this folder**, then **Link**.
+   Browse**. The browser starts at your shared folder and shows native paths
+   (e.g. `C:\Users\you\Documents`); click through to any subfolder and choose
+   **Use this folder**, then **Link**. (You can also just paste a path like
+   `C:\Users\you\Documents\My Vault`.)
+
+   > A web app can't open the native OS file-picker for this — that returns
+   > uploaded file *bytes*, not a folder the server can keep watching. So the
+   > browser navigates the server's view of your shared folder instead.
 
 3. The folder is ingested and kept in sync. **All supported document types** are
    imported — Markdown, PDF, Word/Excel/PowerPoint, plain text, source code, and

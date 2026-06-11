@@ -87,7 +87,7 @@ export function FolderBrowserDialog({
             <CornerLeftUp className="h-4 w-4" />
           </Button>
           <div className="flex-1 min-w-0 rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs truncate">
-            {data?.path ?? '…'}
+            {data?.display_path || data?.path || '…'}
           </div>
         </div>
 
@@ -134,8 +134,9 @@ export function FolderBrowserDialog({
           </Button>
           <Button
             onClick={() => {
-              if (data?.path) {
-                onSelect(data.path)
+              const chosen = data?.display_path || data?.path
+              if (chosen) {
+                onSelect(chosen)
                 onOpenChange(false)
               }
             }}
