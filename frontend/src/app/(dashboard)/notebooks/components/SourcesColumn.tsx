@@ -10,13 +10,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Plus, FileText, Link2, ChevronDown, Loader2 } from 'lucide-react'
+import { Plus, FileText, Link2, ChevronDown, Loader2, FolderGit2, RefreshCw } from 'lucide-react'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { AddSourceDialog } from '@/components/sources/AddSourceDialog'
 import { AddExistingSourceDialog } from '@/components/sources/AddExistingSourceDialog'
+import { AddVaultDialog } from '@/components/vault/AddVaultDialog'
+import { ConnectedVaults } from '@/components/vault/ConnectedVaults'
 import { SourceCard } from '@/components/sources/SourceCard'
 import { useDeleteSource, useRetrySource, useRemoveSourceFromNotebook } from '@/lib/hooks/use-sources'
+import { useNotebookVaultSubscriptions, useRefreshNotebookVaults } from '@/lib/hooks/use-vault'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { useModalManager } from '@/lib/hooks/use-modal-manager'
 import { ContextMode } from '../[id]/page'
@@ -53,6 +56,7 @@ export function SourcesColumn({
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [addExistingDialogOpen, setAddExistingDialogOpen] = useState(false)
+  const [addVaultDialogOpen, setAddVaultDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [sourceToDelete, setSourceToDelete] = useState<string | null>(null)
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false)
@@ -62,6 +66,19 @@ export function SourcesColumn({
   const deleteSource = useDeleteSource()
   const retrySource = useRetrySource()
   const removeFromNotebook = useRemoveSourceFromNotebook()
+
+  // Vault sync
+  const { data: vaultSubscriptions } = useNotebookVaultSubscriptions(notebookId)
+  const refreshVaults = useRefreshNotebookVaults(notebookId)
+  const hasVaults = (vaultSubscriptions?.length ?? 0) > 0
+
+  const handleRefreshVaults = () => {
+    if (hasVaults) {
+      refreshVaults.mutate()
+    } else {
+      setAddVaultDialogOpen(true)
+    }
+  }
 
   // Collapsible column state
   const { sourcesCollapsed, toggleSources } = useNotebookColumnsStore()
@@ -158,6 +175,16 @@ export function SourcesColumn({
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-lg">{t('navigation.sources')}</CardTitle>
               <div className="flex items-center gap-2">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={handleRefreshVaults}
+                  disabled={refreshVaults.isPending}
+                  title={hasVaults ? t('vault.refresh') : t('vault.addVault')}
+                  aria-label={hasVaults ? t('vault.refresh') : t('vault.addVault')}
+                >
+                  <RefreshCw className={`h-4 w-4 ${refreshVaults.isPending ? 'animate-spin' : ''}`} />
+                </Button>
                 <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
                   <DropdownMenuTrigger asChild>
                     <Button size="sm">
@@ -175,6 +202,10 @@ export function SourcesColumn({
                       <Link2 className="h-4 w-4 mr-2" />
                       {t('sources.addExistingTitle')}
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setDropdownOpen(false); setAddVaultDialogOpen(true); }}>
+                      <FolderGit2 className="h-4 w-4 mr-2" />
+                      {t('vault.addVault')}
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
                 {collapseButton}
@@ -183,6 +214,7 @@ export function SourcesColumn({
           </CardHeader>
 
           <CardContent ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0">
+            <ConnectedVaults notebookId={notebookId} />
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <LoadingSpinner />
@@ -233,6 +265,13 @@ export function SourcesColumn({
       <AddExistingSourceDialog
         open={addExistingDialogOpen}
         onOpenChange={setAddExistingDialogOpen}
+        notebookId={notebookId}
+        onSuccess={onRefresh}
+      />
+
+      <AddVaultDialog
+        open={addVaultDialogOpen}
+        onOpenChange={setAddVaultDialogOpen}
         notebookId={notebookId}
         onSuccess={onRefresh}
       />
