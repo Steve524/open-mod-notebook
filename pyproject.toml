@@ -41,6 +41,8 @@ dependencies = [
     "numpy>=2.4.1",
     "pycountry>=26.2.16",
     "babel>=2.18.0",
+    "watchdog>=4.0.0",
+    "pathspec>=0.12.1",
 ]
 
 [tool.setuptools]

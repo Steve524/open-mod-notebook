@@ -1,0 +1,47 @@
+-- Migration 16: Obsidian / local-folder vault sync.
+-- vault_connection (workspace-level; no notebook link), vault_subscription
+-- (notebook <-> connection edge as a record table), and vault_file_state
+-- (one row per ingested file; the 3-way-diff key).
+
+-- ---------------------------------------------------------------------------
+-- vault_connection
+-- ---------------------------------------------------------------------------
+DEFINE TABLE IF NOT EXISTS vault_connection SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS name ON TABLE vault_connection TYPE string;
+DEFINE FIELD IF NOT EXISTS root_path ON TABLE vault_connection TYPE string;
+DEFINE FIELD IF NOT EXISTS sync_mode ON TABLE vault_connection TYPE string DEFAULT "inherit";
+DEFINE FIELD IF NOT EXISTS include_globs ON TABLE vault_connection TYPE array<string> DEFAULT ["**/*.md"];
+DEFINE FIELD IF NOT EXISTS exclude_globs ON TABLE vault_connection TYPE array<string> DEFAULT [".obsidian/**", "**/.trash/**", "**/*.excalidraw", "templates/**"];
+DEFINE FIELD IF NOT EXISTS embed ON TABLE vault_connection TYPE bool DEFAULT true;
+DEFINE FIELD IF NOT EXISTS transformations ON TABLE vault_connection TYPE array<record> DEFAULT [];
+DEFINE FIELD IF NOT EXISTS status ON TABLE vault_connection TYPE string DEFAULT "idle";
+DEFINE FIELD IF NOT EXISTS last_synced_at ON TABLE vault_connection TYPE option<datetime>;
+DEFINE FIELD IF NOT EXISTS last_error ON TABLE vault_connection TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS stats ON TABLE vault_connection FLEXIBLE TYPE option<object>;
+DEFINE FIELD IF NOT EXISTS created ON TABLE vault_connection DEFAULT time::now() VALUE $before OR time::now();
+DEFINE FIELD IF NOT EXISTS updated ON TABLE vault_connection DEFAULT time::now() VALUE time::now();
+
+-- ---------------------------------------------------------------------------
+-- vault_subscription (unique per notebook+connection)
+-- ---------------------------------------------------------------------------
+DEFINE TABLE IF NOT EXISTS vault_subscription SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS notebook ON TABLE vault_subscription TYPE record<notebook>;
+DEFINE FIELD IF NOT EXISTS connection ON TABLE vault_subscription TYPE record<vault_connection>;
+DEFINE FIELD IF NOT EXISTS created ON TABLE vault_subscription DEFAULT time::now() VALUE $before OR time::now();
+DEFINE FIELD IF NOT EXISTS updated ON TABLE vault_subscription DEFAULT time::now() VALUE time::now();
+DEFINE INDEX IF NOT EXISTS idx_vault_subscription_unique ON TABLE vault_subscription FIELDS notebook, connection UNIQUE;
+
+-- ---------------------------------------------------------------------------
+-- vault_file_state (one per ingested file; unique per connection+rel_path)
+-- ---------------------------------------------------------------------------
+DEFINE TABLE IF NOT EXISTS vault_file_state SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS connection ON TABLE vault_file_state TYPE record<vault_connection>;
+DEFINE FIELD IF NOT EXISTS rel_path ON TABLE vault_file_state TYPE string;
+DEFINE FIELD IF NOT EXISTS source ON TABLE vault_file_state TYPE record<source>;
+DEFINE FIELD IF NOT EXISTS content_hash ON TABLE vault_file_state TYPE string;
+DEFINE FIELD IF NOT EXISTS mtime ON TABLE vault_file_state TYPE float DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS size ON TABLE vault_file_state TYPE int DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS last_seen_at ON TABLE vault_file_state TYPE option<datetime>;
+DEFINE FIELD IF NOT EXISTS created ON TABLE vault_file_state DEFAULT time::now() VALUE $before OR time::now();
+DEFINE FIELD IF NOT EXISTS updated ON TABLE vault_file_state DEFAULT time::now() VALUE time::now();
+DEFINE INDEX IF NOT EXISTS idx_vault_file_state_conn_rel ON TABLE vault_file_state FIELDS connection, rel_path UNIQUE;
