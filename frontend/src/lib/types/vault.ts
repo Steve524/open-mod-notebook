@@ -45,6 +45,21 @@ export interface CreateVaultConnectionRequest {
   transformations?: string[]
 }
 
+export interface UpdateVaultConnectionRequest {
+  name?: string
+  root_path?: string
+  sync_mode?: VaultSyncMode
+  include_globs?: string[]
+  exclude_globs?: string[]
+  embed?: boolean
+  transformations?: string[]
+}
+
+export interface RemoveVaultResponse {
+  deleted: boolean
+  purged_sources: number
+}
+
 export interface ValidatePathResponse {
   exists: boolean
   readable: boolean

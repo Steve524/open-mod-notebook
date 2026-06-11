@@ -6,16 +6,23 @@ import { useTranslation } from '@/lib/hooks/use-translation'
 import { getApiErrorMessage } from '@/lib/utils/error-handler'
 import {
   CreateVaultConnectionRequest,
+  UpdateVaultConnectionRequest,
+  VaultConnectionResponse,
   VaultSubscriptionResponse,
 } from '@/lib/types/vault'
 
-/** All vault connections (workspace resource). */
+/** All vault connections (workspace resource). Polls while any is scanning. */
 export function useVaultConnections(enabled = true) {
   return useQuery({
     queryKey: QUERY_KEYS.vaultConnections,
     queryFn: () => vaultApi.listConnections(),
     enabled,
     staleTime: 10 * 1000,
+    refetchInterval: (query) => {
+      const data = query.state.data as VaultConnectionResponse[] | undefined
+      const scanning = data?.some((c) => c.status === 'scanning')
+      return scanning ? 2000 : false
+    },
   })
 }
 
@@ -89,6 +96,112 @@ export function useRefreshVaultConnection(notebookId: string) {
       toast({
         title: t('common.error'),
         description: getApiErrorMessage(error, (key) => t(key), t('vault.refreshFailed')),
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+/** Refresh every connection (Sources page). */
+export function useRefreshAllVaults() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const { t } = useTranslation()
+
+  return useMutation({
+    mutationFn: () => vaultApi.refreshAll(),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.vaultConnections })
+      queryClient.invalidateQueries({ queryKey: ['sources'] })
+      toast({
+        title: t('vault.refreshStarted'),
+        description: t('vault.refreshStartedDesc').replace(
+          '{count}',
+          String(result.job_ids.length)
+        ),
+      })
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: t('common.error'),
+        description: getApiErrorMessage(error, (key) => t(key), t('vault.refreshFailed')),
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+/** Refresh one connection from the workspace (Sources page) scope. */
+export function useRefreshConnection() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const { t } = useTranslation()
+
+  return useMutation({
+    mutationFn: (connectionId: string) => vaultApi.refreshConnection(connectionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.vaultConnections })
+      queryClient.invalidateQueries({ queryKey: ['sources'] })
+      toast({ title: t('vault.refreshStarted') })
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: t('common.error'),
+        description: getApiErrorMessage(error, (key) => t(key), t('vault.refreshFailed')),
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+export function useUpdateVaultConnection() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const { t } = useTranslation()
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateVaultConnectionRequest }) =>
+      vaultApi.updateConnection(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.vaultConnections })
+      toast({ title: t('vault.updated') })
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: t('common.error'),
+        description: getApiErrorMessage(error, (key) => t(key), t('vault.updateFailed')),
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+/** REMOVE LINK — delete a connection (Sources page only). Affects all subscribers. */
+export function useRemoveVaultConnection() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const { t } = useTranslation()
+
+  return useMutation({
+    mutationFn: ({ id, purgeSources }: { id: string; purgeSources: boolean }) =>
+      vaultApi.removeConnection(id, purgeSources),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.vaultConnections })
+      // Subscriptions and (optionally) sources change for every notebook.
+      queryClient.invalidateQueries({ queryKey: ['vault', 'subscriptions'] })
+      queryClient.invalidateQueries({ queryKey: ['sources'] })
+      toast({
+        title: t('vault.removed'),
+        description: t('vault.removedDesc').replace(
+          '{count}',
+          String(result.purged_sources)
+        ),
+      })
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: t('common.error'),
+        description: getApiErrorMessage(error, (key) => t(key), t('vault.removeFailed')),
         variant: 'destructive',
       })
     },

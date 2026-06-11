@@ -3,6 +3,8 @@ import {
   VaultConnectionResponse,
   VaultSubscriptionResponse,
   CreateVaultConnectionRequest,
+  UpdateVaultConnectionRequest,
+  RemoveVaultResponse,
   ValidatePathResponse,
   VaultJobResponse,
 } from '@/lib/types/vault'
@@ -11,6 +13,27 @@ export const vaultApi = {
   // Connections (workspace resource)
   listConnections: async () => {
     const response = await apiClient.get<VaultConnectionResponse[]>('/vault-connections')
+    return response.data
+  },
+
+  updateConnection: async (connectionId: string, data: UpdateVaultConnectionRequest) => {
+    const response = await apiClient.patch<VaultConnectionResponse>(
+      `/vault-connections/${connectionId}`,
+      data
+    )
+    return response.data
+  },
+
+  removeConnection: async (connectionId: string, purgeSources: boolean) => {
+    const response = await apiClient.delete<RemoveVaultResponse>(
+      `/vault-connections/${connectionId}`,
+      { params: { purge_sources: purgeSources } }
+    )
+    return response.data
+  },
+
+  refreshAll: async () => {
+    const response = await apiClient.post<VaultJobResponse>('/vault-connections/refresh-all')
     return response.data
   },
 

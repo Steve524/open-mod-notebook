@@ -13,6 +13,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/hooks/use-translation'
+import { VaultConnectionsPanel } from '@/components/vault/VaultConnectionsPanel'
 import { getDateLocale } from '@/lib/utils/date-locale'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -274,11 +275,16 @@ export default function SourcesPage() {
   if (sources.length === 0) {
     return (
       <AppShell>
-        <EmptyState
-          icon={FileText}
-          title={t('sources.noSourcesYet')}
-          description={t('sources.allSourcesDescShort')}
-        />
+        <div className="flex flex-col h-full w-full max-w-none px-6 py-6">
+          <VaultConnectionsPanel />
+          <div className="flex-1 flex items-center justify-center">
+            <EmptyState
+              icon={FileText}
+              title={t('sources.noSourcesYet')}
+              description={t('sources.allSourcesDescShort')}
+            />
+          </div>
+        </div>
       </AppShell>
     )
   }
@@ -292,6 +298,8 @@ export default function SourcesPage() {
             {t('sources.allSourcesDesc')}
           </p>
         </div>
+
+        <VaultConnectionsPanel />
 
         <div ref={scrollContainerRef} className="flex-1 rounded-md border overflow-auto">
           <table
