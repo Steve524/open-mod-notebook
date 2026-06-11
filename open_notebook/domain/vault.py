@@ -17,13 +17,53 @@ from surrealdb import RecordID
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.base import ObjectModel
 
-DEFAULT_INCLUDE_GLOBS = ["**/*.md"]
+# ---------------------------------------------------------------------------
+# Supported file types — SINGLE SOURCE OF TRUTH
+#
+# Everything the ingestion pipeline (process_source -> source_graph ->
+# content-core) actually extracts text from. This list was verified
+# EMPIRICALLY against this image's content-core build, not guessed: each
+# extension was run through extract_content and only the ones that produced
+# text are kept. Notably content-core's *file* extraction rejects html/json/
+# tsv and (without ebooklib) epub with UnsupportedTypeException, so those are
+# excluded. csv is also excluded: there is no text/csv extractor, so whether a
+# CSV ingests depends on a fragile heuristic (some classify as text/csv -> fail,
+# others as text/plain -> ok) -- too unreliable to default on; xlsx covers
+# tabular data. Images/audio/video are excluded (they need vision/speech).
+#
+# The default include globs and the /vault/supported-extensions endpoint are
+# both derived from this tuple, and the frontend prefills from that endpoint,
+# so the two never drift.
+# ---------------------------------------------------------------------------
+SUPPORTED_EXTENSIONS = (
+    # Markdown
+    "md", "markdown", "mdown", "mkd",
+    # Plain text
+    "txt", "text", "rst", "log",
+    # Markup & structured data
+    "xml", "yaml", "yml",
+    # Code (extracted as plain text)
+    "py", "js", "ts", "jsx", "tsx", "java", "c", "cpp", "h", "hpp",
+    "cs", "go", "rs", "rb", "php", "sh", "bash", "zsh", "sql", "swift", "kt",
+    # Rich documents (extracted via content-core: pypdf / python-docx /
+    # openpyxl / python-pptx)
+    "pdf", "docx", "xlsx", "pptx",
+)
+
+DEFAULT_INCLUDE_GLOBS = [f"**/*.{ext}" for ext in SUPPORTED_EXTENSIONS]
 DEFAULT_EXCLUDE_GLOBS = [
     ".obsidian/**",
     "**/.trash/**",
     "**/*.excalidraw",
+    "**/*.excalidraw.md",
     "templates/**",
 ]
+
+
+def is_supported_file(name: str) -> bool:
+    """True if a filename has a supported, ingestable extension."""
+    lower = name.lower()
+    return any(lower.endswith("." + ext) for ext in SUPPORTED_EXTENSIONS)
 
 
 def _to_record(value: Any) -> Any:

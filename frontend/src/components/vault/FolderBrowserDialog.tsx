@@ -117,9 +117,9 @@ export function FolderBrowserDialog({
                 >
                   <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="flex-1 min-w-0 truncate">{entry.name}</span>
-                  {entry.md_count > 0 && (
+                  {entry.doc_count > 0 && (
                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">
-                      {t('vault.browseMdCount').replace('{count}', String(entry.md_count))}
+                      {t('vault.browseDocCount').replace('{count}', String(entry.doc_count))}
                     </Badge>
                   )}
                 </button>

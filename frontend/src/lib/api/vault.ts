@@ -8,6 +8,7 @@ import {
   ValidatePathResponse,
   VaultJobResponse,
   BrowseResponse,
+  SupportedExtensionsResponse,
 } from '@/lib/types/vault'
 
 export const vaultApi = {
@@ -59,6 +60,13 @@ export const vaultApi = {
     const response = await apiClient.get<BrowseResponse>('/vault/browse', {
       params: path ? { path } : undefined,
     })
+    return response.data
+  },
+
+  supportedExtensions: async () => {
+    const response = await apiClient.get<SupportedExtensionsResponse>(
+      '/vault/supported-extensions'
+    )
     return response.data
   },
 

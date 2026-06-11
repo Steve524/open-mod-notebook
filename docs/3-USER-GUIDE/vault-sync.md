@@ -1,6 +1,6 @@
 # Vault Sync (Obsidian & local folders)
 
-Connect a local folder — typically an [Obsidian](https://obsidian.md) vault — and have its Markdown files ingested as normal Open Notebook **sources**, kept in sync as you edit. Ingestion happens **once per file** at the workspace level; notebooks **subscribe** to a vault, so the same vault can feed many notebooks with no duplicate ingestion or embedding.
+Connect a local folder — typically an [Obsidian](https://obsidian.md) vault — and have its documents ingested as normal Open Notebook **sources**, kept in sync as you edit. **All supported document types** are imported (Markdown, PDF, Word/Excel/PowerPoint, plain text, source code, and structured data like XML and YAML), not just Markdown; HTML, JSON, CSV, EPUB, images, audio, and video are skipped. Ingestion happens **once per file** at the workspace level; notebooks **subscribe** to a vault, so the same vault can feed many notebooks with no duplicate ingestion or embedding.
 
 > **Key idea:** the **server** reads the folder, not your browser. The path you enter is the path *as the server sees it*. On a local install that's a normal path; in Docker you bind-mount the vault and enter the in-container path (see [Docker](#docker-mounting-your-vault)).
 
@@ -21,7 +21,7 @@ Connect a local folder — typically an [Obsidian](https://obsidian.md) vault �
 1. Open a notebook. In the **Sources** panel, open the **＋** menu → **Connect a vault** (or click the **↻** refresh icon when the notebook has no vaults yet).
 2. **Link new:**
    - **Name** — anything memorable.
-   - **Folder path** — the path as the server sees it. Click **Validate** to confirm the server can read it; it reports how many Markdown files it found, with a few samples.
+   - **Folder path** — the path as the server sees it. Use **Browse** to navigate the server's folders (starting at the mounted root), or type it. Click **Validate** to confirm the server can read it; it reports how many supported files it found, with a few samples.
    - **Include / Exclude globs** — prefilled with sensible Obsidian defaults (see below). One glob per line.
    - **Embed for semantic search** — on by default.
 3. Submit. The first sync starts immediately; sources appear shortly.
@@ -32,10 +32,10 @@ To point another notebook at an existing vault, use **Connect a vault → Subscr
 
 | | Default |
 |---|---|
-| **Include** | `**/*.md` |
-| **Exclude** | `.obsidian/**`, `**/.trash/**`, `**/*.excalidraw`, `templates/**` |
+| **Include** | One glob per supported type — `**/*.md`, `**/*.pdf`, `**/*.docx`, `**/*.xlsx`, `**/*.txt`, code files, … |
+| **Exclude** | `.obsidian/**`, `**/.trash/**`, `**/*.excalidraw`, `**/*.excalidraw.md`, `templates/**` |
 
-These skip Obsidian's config, trash, drawings, and templates. Adjust them per vault at any time via **Edit** on the Sources page.
+The include list is prefilled from the backend's canonical supported-extensions set, so it always matches what the pipeline can actually ingest. The excludes skip Obsidian's config, trash, drawings, and templates. Adjust either per vault at any time via **Edit** on the Sources page — narrow the includes to just the types you want, or add more.
 
 ---
 
@@ -96,5 +96,5 @@ See the [Environment Reference](../5-CONFIGURATION/environment-reference.md#vaul
 
 - **Big vaults** — tighten the include/exclude globs so you only ingest what you need; the first sync (and every live rescan) scales with file count. The Validate step warns when a folder is large.
 - **Embeddings** — each file is embedded once, regardless of how many notebooks subscribe.
-- **Markdown only by default** — change the include globs if you want other extensions; ingestion uses the same pipeline as uploaded sources.
+- **All supported document types by default** — Markdown, PDF, Word/Excel/PowerPoint, plain text, source code, and structured data (XML, YAML), using the same pipeline as uploaded sources. Narrow the include globs if you only want certain types. HTML, JSON, CSV, EPUB, images, audio, and video are not ingested (content-core can't extract them as local files).
 - **Your files are never modified or deleted by Open Notebook** — sync is one-way (disk → Open Notebook).

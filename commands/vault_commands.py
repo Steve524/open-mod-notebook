@@ -77,14 +77,24 @@ def _iter_files(root: str, include: pathspec.PathSpec, exclude: pathspec.PathSpe
             yield rel_path, abs_path
 
 
-def _hash_text(abs_path: str) -> str:
-    with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
-        return hashlib.sha256(f.read().encode("utf-8")).hexdigest()
+def _hash_file(abs_path: str) -> str:
+    """Hash raw bytes so changes to ANY file type (PDFs, docx, …) are detected.
+
+    Reading as text was lossy for binaries; bytes are exact. Streamed in chunks
+    to avoid loading large documents fully into memory.
+    """
+    h = hashlib.sha256()
+    with open(abs_path, "rb") as f:
+        for block in iter(lambda: f.read(65536), b""):
+            h.update(block)
+    return h.hexdigest()
 
 
 def _file_title(rel_path: str) -> str:
+    """Derive a title from the filename, stripping any extension generically."""
     base = os.path.basename(rel_path)
-    return base[:-3] if base.lower().endswith(".md") else base
+    stem, _ext = os.path.splitext(base)
+    return stem or base
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +223,7 @@ async def sync_vault_command(input_data: SyncVaultInput) -> SyncVaultOutput:
                 stats["skipped"] += 1
                 continue
 
-            content_hash = _hash_text(abs_path)
+            content_hash = _hash_file(abs_path)
 
             if prev is None:
                 # ADD

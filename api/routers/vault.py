@@ -20,9 +20,11 @@ from open_notebook.domain.notebook import Source
 from open_notebook.domain.vault import (
     DEFAULT_EXCLUDE_GLOBS,
     DEFAULT_INCLUDE_GLOBS,
+    SUPPORTED_EXTENSIONS,
     VaultConnection,
     VaultFileState,
     VaultSubscription,
+    is_supported_file,
 )
 
 # Import so the sync_vault command is registered in the API process registry.
@@ -112,7 +114,7 @@ class VaultJobResponse(BaseModel):
 class BrowseEntry(BaseModel):
     name: str
     path: str
-    md_count: int = 0  # shallow count of direct .md children (a "this is a vault" hint)
+    doc_count: int = 0  # shallow count of ingestable children (a "this is a vault" hint)
 
 
 class BrowseResponse(BaseModel):
@@ -162,13 +164,13 @@ def _default_browse_root() -> str:
     return os.path.realpath(os.sep)
 
 
-def _shallow_md_count(directory: str, cap: int = 200) -> int:
-    """Count direct .md children (cheap hint; not recursive)."""
+def _shallow_doc_count(directory: str, cap: int = 200) -> int:
+    """Count direct ingestable children (cheap hint; not recursive)."""
     count = 0
     try:
         with os.scandir(directory) as it:
             for entry in it:
-                if entry.name.lower().endswith(".md") and entry.is_file():
+                if entry.is_file() and is_supported_file(entry.name):
                     count += 1
                     if count >= cap:
                         break
@@ -440,6 +442,26 @@ async def watch_stop(connection_id: str):
 # ---------------------------------------------------------------------------
 # UI helper
 # ---------------------------------------------------------------------------
+class SupportedExtensionsResponse(BaseModel):
+    extensions: List[str]
+    include_globs: List[str]
+    exclude_globs: List[str]
+
+
+@router.get("/vault/supported-extensions", response_model=SupportedExtensionsResponse)
+async def supported_extensions():
+    """The canonical set of ingestable file types + the default globs.
+
+    The frontend prefills the Add-a-vault dialog from this, so backend and
+    frontend can't drift on what "all supported types" means.
+    """
+    return SupportedExtensionsResponse(
+        extensions=list(SUPPORTED_EXTENSIONS),
+        include_globs=list(DEFAULT_INCLUDE_GLOBS),
+        exclude_globs=list(DEFAULT_EXCLUDE_GLOBS),
+    )
+
+
 @router.post("/vault/validate-path", response_model=ValidatePathResponse)
 async def validate_path(body: ValidatePathRequest):
     p = Path(body.root_path)
@@ -453,7 +475,7 @@ async def validate_path(body: ValidatePathRequest):
         try:
             for dirpath, _dirnames, filenames in os.walk(body.root_path):
                 for name in filenames:
-                    if name.lower().endswith(".md"):
+                    if is_supported_file(name):
                         count += 1
                         if len(sample) < 10:
                             rel = os.path.relpath(
@@ -507,7 +529,7 @@ async def browse(path: Optional[str] = Query(None)):
             full = os.path.join(target, name)
             if os.path.isdir(full):
                 entries.append(
-                    BrowseEntry(name=name, path=full, md_count=_shallow_md_count(full))
+                    BrowseEntry(name=name, path=full, doc_count=_shallow_doc_count(full))
                 )
     except PermissionError:
         raise HTTPException(status_code=400, detail="Permission denied reading directory")

@@ -10,6 +10,17 @@ from open_notebook.domain.notebook import Source
 from open_notebook.domain.transformation import Transformation
 from open_notebook.exceptions import ConfigurationError
 
+# An unsupported/unextractable file type can never succeed on retry, so treat it
+# as a permanent failure (don't retry). Matters for vault sync, which may meet
+# files content-core can't parse. Imported defensively in case content-core's
+# layout changes.
+try:
+    from content_core.common.exceptions import UnsupportedTypeException
+except Exception:  # pragma: no cover
+
+    class UnsupportedTypeException(Exception):
+        pass
+
 try:
     from open_notebook.graphs.source import source_graph
     from open_notebook.graphs.transformation import graph as transform_graph
@@ -54,7 +65,8 @@ class SourceProcessingOutput(CommandOutput):
         "wait_strategy": "exponential_jitter",
         "wait_min": 1,
         "wait_max": 120,  # Allow queue to drain
-        "stop_on": [ValueError, ConfigurationError],  # Don't retry validation/config errors
+        # Don't retry validation/config errors or unprocessable file types.
+        "stop_on": [ValueError, ConfigurationError, UnsupportedTypeException],
         "retry_log_level": "debug",  # Avoid log noise during transaction conflicts
     },
 )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   FolderGit2,
   FolderSearch,
@@ -79,6 +79,30 @@ export function AddVaultDialog({
   const { data: connections, isLoading: connectionsLoading } = useVaultConnections(open)
   const linkVault = useLinkVault(notebookId)
   const subscribeVault = useSubscribeVault(notebookId)
+
+  // Prefill globs from the backend's authoritative supported-extensions list,
+  // so the two never drift. Only applies while the fields are untouched.
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    vaultApi
+      .supportedExtensions()
+      .then((res) => {
+        if (cancelled) return
+        setIncludeText((cur) =>
+          cur === DEFAULT_INCLUDE_GLOBS.join('\n') ? res.include_globs.join('\n') : cur
+        )
+        setExcludeText((cur) =>
+          cur === DEFAULT_EXCLUDE_GLOBS.join('\n') ? res.exclude_globs.join('\n') : cur
+        )
+      })
+      .catch(() => {
+        /* fall back to the bundled defaults */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open])
 
   const resetAndClose = () => {
     setName('')
@@ -257,6 +281,8 @@ export function AddVaultDialog({
                 </div>
               )}
             </div>
+
+            <p className="text-xs text-muted-foreground">{t('vault.supportedHint')}</p>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">

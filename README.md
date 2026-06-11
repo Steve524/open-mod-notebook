@@ -53,6 +53,17 @@ The notebook page has a **"Generate from sources"** tile grid that turns your se
 
 Every result is grounded strictly in the selected sources and saved as a typed Note, so you can reopen it any time without regenerating.
 
+### 🗂️ Vault sync — connect a local folder (e.g. an Obsidian vault)
+
+Link a folder on your machine to a notebook and its documents become normal sources, ingested through the existing pipeline and kept in sync.
+
+- **Browse to pick a folder** — the server reads the files (not the browser), so a built-in folder browser navigates the *server's* filesystem, starting at the read-only mount (`/host`). In Docker you bind-mount your folder via `VAULTS_HOST_DIR` in `.env`.
+- **All supported document types**, not just Markdown — PDF, Word/Excel/PowerPoint, plain text, source code, and structured data (XML, YAML). HTML, JSON, CSV, EPUB, images, audio, and video are skipped.
+- **One source per file, shared across notebooks** — subscribe many notebooks to one vault with no duplicate ingestion or embedding.
+- **Manual Refresh (default) or Live watch** — auto-sync on add/edit/delete/rename; a global Settings toggle, overridable per vault.
+
+Set `VAULTS_HOST_DIR` in `.env`, run the local build below, then in a notebook use **Sources → Connect a vault → Browse**. See [SETUP.md](SETUP.md#sync-a-local-folder-obsidian-vault) and the [Vault Sync guide](docs/3-USER-GUIDE/vault-sync.md).
+
 ### 🎨 Three new themes
 
 Alongside Light / Dark / System, the theme switcher (sidebar and ⌘K command palette) adds:

@@ -77,7 +77,7 @@ export interface VaultJobResponse {
 export interface BrowseEntry {
   name: string
   path: string
-  md_count: number
+  doc_count: number
 }
 
 export interface BrowseResponse {
@@ -87,10 +87,34 @@ export interface BrowseResponse {
   entries: BrowseEntry[]
 }
 
-export const DEFAULT_INCLUDE_GLOBS = ['**/*.md']
+export interface SupportedExtensionsResponse {
+  extensions: string[]
+  include_globs: string[]
+  exclude_globs: string[]
+}
+
+// Fallback only — the dialog fetches the authoritative globs from
+// GET /api/vault/supported-extensions (single source of truth in the backend).
+// Keep this in sync with SUPPORTED_EXTENSIONS in open_notebook/domain/vault.py.
+const SUPPORTED_EXTENSIONS = [
+  // Markdown
+  'md', 'markdown', 'mdown', 'mkd',
+  // Plain text
+  'txt', 'text', 'rst', 'log',
+  // Markup & structured data
+  'xml', 'yaml', 'yml',
+  // Code
+  'py', 'js', 'ts', 'jsx', 'tsx', 'java', 'c', 'cpp', 'h', 'hpp',
+  'cs', 'go', 'rs', 'rb', 'php', 'sh', 'bash', 'zsh', 'sql', 'swift', 'kt',
+  // Rich documents
+  'pdf', 'docx', 'xlsx', 'pptx',
+]
+
+export const DEFAULT_INCLUDE_GLOBS = SUPPORTED_EXTENSIONS.map((ext) => `**/*.${ext}`)
 export const DEFAULT_EXCLUDE_GLOBS = [
   '.obsidian/**',
   '**/.trash/**',
   '**/*.excalidraw',
+  '**/*.excalidraw.md',
   'templates/**',
 ]

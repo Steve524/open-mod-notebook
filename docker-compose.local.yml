@@ -1,0 +1,112 @@
+# =============================================================================
+# docker-compose.local.yml
+# -----------------------------------------------------------------------------
+# Local development / fork build for open-mod-notebook
+# (fork of https://github.com/lfnovo/open-notebook)
+#
+# Unlike the default docker-compose.yml, this file BUILDS the open_notebook
+# image from the local source tree (the repo's multi-stage Dockerfile) instead
+# of pulling a pre-built image from Docker Hub. This guarantees your fork's
+# code changes are actually compiled into the running container.
+#
+# Usage:
+#   docker compose -f docker-compose.local.yml up --build -d
+#
+# Requires Docker Compose v2 (the `docker compose` command, not `docker-compose`).
+# See SETUP.md for the full quickstart.
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # SurrealDB — graph database + vector store.
+  # Pulled as a pre-built image (no local build needed). Unchanged from upstream.
+  # ---------------------------------------------------------------------------
+  surrealdb:
+    image: surrealdb/surrealdb:v2
+    command: start --log info --user root --pass root rocksdb:/mydata/mydatabase.db
+    user: root  # Required for bind-mount permissions on Linux
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./surreal_data:/mydata   # Persistent database files
+    environment:
+      - SURREAL_EXPERIMENTAL_GRAPHQL=true
+    restart: always
+
+  # ---------------------------------------------------------------------------
+  # open_notebook — FastAPI backend + Next.js frontend in one container.
+  # BUILT LOCALLY from this repo's Dockerfile so fork changes are included.
+  # ---------------------------------------------------------------------------
+  open_notebook:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Optional build args. Uncomment NPM_REGISTRY if you are behind a
+      # corporate proxy or need a mirror for npm during the frontend build.
+      # args:
+      #   NPM_REGISTRY: https://registry.npmjs.org/
+    image: open-mod-notebook:local   # Tag for the locally built image
+    ports:
+      - "8502:8502"  # Web UI
+      - "5055:5055"  # REST API (docs at /docs)
+    # Secrets and connection settings are managed in .env (see template below).
+    env_file:
+      - .env
+    environment:
+      # ---------------------------------------------------------------------
+      # CHANGE ME: encryption key for API keys stored in SurrealDB.
+      # This is also settable via .env (OPEN_NOTEBOOK_ENCRYPTION_KEY). The
+      # .env value wins if both are set. It MUST stay constant across restarts
+      # — changing it after first run breaks all saved credentials.
+      # ---------------------------------------------------------------------
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=${OPEN_NOTEBOOK_ENCRYPTION_KEY:-change-me-to-a-secret-string}
+
+      # Database connection — points at the surrealdb service above.
+      # Defaults are fine for local dev; override in .env if needed.
+      - SURREAL_URL=${SURREAL_URL:-ws://surrealdb:8000/rpc}
+      - SURREAL_USER=${SURREAL_USER:-root}
+      - SURREAL_PASSWORD=${SURREAL_PASSWORD:-root}
+      - SURREAL_NAMESPACE=${SURREAL_NAMESPACE:-open_notebook}
+      - SURREAL_DATABASE=${SURREAL_DATABASE:-open_notebook}
+
+      # ---------------------------------------------------------------------
+      # Vault sync — expose a host folder (read-only) for browsing & syncing.
+      # VAULTS_HOST_DIR (set in .env) is bind-mounted at /host below; the app
+      # can only see folders under it. The polling watcher is used so live
+      # sync works across bind mounts from a Windows/macOS host, where inotify
+      # events don't reach the Linux container.
+      # ---------------------------------------------------------------------
+      - OPEN_NOTEBOOK_VAULTS_BASE_DIR=/host
+      - OPEN_NOTEBOOK_VAULT_WATCHER=poll
+    volumes:
+      - ./notebook_data:/app/data   # Persistent user data (notebooks, uploads)
+      # Your host folder, browsable in-app at /host (read-only — sync only reads).
+      # Set VAULTS_HOST_DIR in .env to your profile/vault parent; defaults to the
+      # data dir so the stack still starts if you haven't set it yet.
+      - "${VAULTS_HOST_DIR:-./notebook_data}:/host:ro"
+    depends_on:
+      - surrealdb
+    restart: unless-stopped   # Dev-friendly: won't restart after you stop it
+
+# =============================================================================
+# Example .env file (create one next to this compose file):
+# -----------------------------------------------------------------------------
+#   # REQUIRED — set to a real secret. Keep it constant forever.
+#   OPEN_NOTEBOOK_ENCRYPTION_KEY=replace-with-a-long-random-string
+#
+#   # Optional — only set these if you want non-default DB credentials.
+#   # SURREAL_URL=ws://surrealdb:8000/rpc
+#   # SURREAL_USER=root
+#   # SURREAL_PASSWORD=root
+#   # SURREAL_NAMESPACE=open_notebook
+#   # SURREAL_DATABASE=open_notebook
+#
+#   # Vault sync — folder made browsable inside the app at /host (read-only).
+#   # Point it at the PARENT of your vaults so you can browse to any subfolder.
+#   # Windows:  VAULTS_HOST_DIR=C:/Users/YOUR_USERNAME
+#   # macOS:    VAULTS_HOST_DIR=/Users/YOUR_USERNAME
+#   # Linux:    VAULTS_HOST_DIR=/home/YOUR_USERNAME
+#
+# AI provider keys are NOT required here — add them in the app UI under
+# Settings -> API Keys after the stack is running.
+# =============================================================================
