@@ -1,0 +1,16 @@
+-- Migration 17: push-mode fields for vault_connection (Obsidian plugin sync).
+-- Adds the client-push identity (kind/vault_id/vault_fingerprint/token_hash)
+-- and relaxes root_path so push connections (which have no folder) can save.
+
+DEFINE FIELD IF NOT EXISTS kind ON TABLE vault_connection TYPE string DEFAULT "push";
+DEFINE FIELD IF NOT EXISTS vault_id ON TABLE vault_connection TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS vault_fingerprint ON TABLE vault_connection TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS token_hash ON TABLE vault_connection TYPE option<string>;
+
+-- Relax root_path to optional. OVERWRITE (not IF NOT EXISTS) because migration
+-- 16 already defined it as a required `string`; IF NOT EXISTS would no-op and
+-- leave it required, blocking push connections that have no path.
+DEFINE FIELD OVERWRITE root_path ON TABLE vault_connection TYPE option<string>;
+
+-- vault_id is the push dedup key; one connection per vault.
+DEFINE INDEX IF NOT EXISTS idx_vault_connection_vault_id ON TABLE vault_connection FIELDS vault_id UNIQUE;

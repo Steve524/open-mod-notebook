@@ -80,7 +80,14 @@ class VaultConnection(ObjectModel):
     nullable_fields: ClassVar[set[str]] = {"last_error", "last_synced_at", "stats"}
 
     name: str
-    root_path: str
+    # "push" = client-push (Obsidian plugin); "local" = shelved server-disk model.
+    kind: str = "push"
+    # Push identity (minted by the plugin); the dedup key for push connections.
+    vault_id: Optional[str] = None
+    vault_fingerprint: Optional[str] = None  # cross-device dedup
+    token_hash: Optional[str] = None  # reserved for per-connection tokens (Phase 6)
+    # Only the (shelved) local/disk model has a folder path; push has none.
+    root_path: Optional[str] = None
     sync_mode: str = "inherit"  # "manual" | "live" | "inherit"
     include_globs: List[str] = Field(default_factory=lambda: list(DEFAULT_INCLUDE_GLOBS))
     exclude_globs: List[str] = Field(default_factory=lambda: list(DEFAULT_EXCLUDE_GLOBS))
@@ -97,6 +104,24 @@ class VaultConnection(ObjectModel):
         if not v:
             return []
         return [_to_record(x) for x in v]
+
+    @classmethod
+    async def get_by_vault_id(cls, vault_id: str) -> Optional["VaultConnection"]:
+        """Look up a push connection by its plugin-minted vault_id."""
+        rows = await repo_query(
+            "SELECT * FROM vault_connection WHERE vault_id = $v LIMIT 1",
+            {"v": vault_id},
+        )
+        return cls(**rows[0]) if rows else None
+
+    @classmethod
+    async def get_by_fingerprint(cls, fingerprint: str) -> Optional["VaultConnection"]:
+        """Cross-device dedup: find a connection by its vault fingerprint."""
+        rows = await repo_query(
+            "SELECT * FROM vault_connection WHERE vault_fingerprint = $f LIMIT 1",
+            {"f": fingerprint},
+        )
+        return cls(**rows[0]) if rows else None
 
 
 class VaultSubscription(ObjectModel):

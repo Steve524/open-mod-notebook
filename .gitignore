@@ -141,6 +141,9 @@ specs/
 # ...but the canonical local-build compose IS part of the repo (README/SETUP
 # tell users to run it). Other *.local.yml files remain ignored as overrides.
 !docker-compose.local.yml
+
+# Third-party reference (Apache-2.0 SurfSense plugin) — study only, never commit.
+notes/surfsense_obsidian_reference/
 **/*.local.md
 .harness/
 

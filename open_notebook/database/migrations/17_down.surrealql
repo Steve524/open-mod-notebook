@@ -1,0 +1,8 @@
+-- Down for migration 17. Removes the push-mode index and fields.
+-- root_path is deliberately left as option<string>: restoring the required
+-- `string` type would fail for any push rows that have no path (data loss).
+REMOVE INDEX IF EXISTS idx_vault_connection_vault_id ON TABLE vault_connection;
+REMOVE FIELD IF EXISTS kind ON TABLE vault_connection;
+REMOVE FIELD IF EXISTS vault_id ON TABLE vault_connection;
+REMOVE FIELD IF EXISTS vault_fingerprint ON TABLE vault_connection;
+REMOVE FIELD IF EXISTS token_hash ON TABLE vault_connection;
