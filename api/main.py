@@ -28,6 +28,7 @@ from api.routers import (
     models,
     notebooks,
     notes,
+    obsidian,
     podcasts,
     search,
     settings,
@@ -321,6 +322,7 @@ app.include_router(settings.router, prefix="/api", tags=["settings"])
 app.include_router(context.router, prefix="/api", tags=["context"])
 app.include_router(sources.router, prefix="/api", tags=["sources"])
 app.include_router(vault.router, prefix="/api", tags=["vault"])
+app.include_router(obsidian.router, prefix="/api/v1", tags=["obsidian"])
 app.include_router(insights.router, prefix="/api", tags=["insights"])
 app.include_router(commands_router.router, prefix="/api", tags=["commands"])
 app.include_router(podcasts.router, prefix="/api", tags=["podcasts"])
