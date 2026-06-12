@@ -15,9 +15,9 @@ from typing import List, Optional
 import pathspec
 from loguru import logger
 from pydantic import BaseModel
-from surreal_commands import CommandInput, CommandOutput, command, submit_command
+from surreal_commands import CommandInput, CommandOutput, command
 
-from open_notebook.domain.notebook import Asset, Source
+from commands.vault_engine import apply_delete, apply_rename, apply_upsert
 from open_notebook.domain.vault import (
     VaultConnection,
     VaultFileState,
@@ -90,39 +90,9 @@ def _hash_file(abs_path: str) -> str:
     return h.hexdigest()
 
 
-def _file_title(rel_path: str) -> str:
-    """Derive a title from the filename, stripping any extension generically."""
-    base = os.path.basename(rel_path)
-    stem, _ext = os.path.splitext(base)
-    return stem or base
-
-
 # ---------------------------------------------------------------------------
-# Apply operations
-# ---------------------------------------------------------------------------
-async def _submit_process(source_id: str, abs_path: str, conn: VaultConnection):
-    submit_command(
-        "open_notebook",
-        "process_source",
-        {
-            "source_id": source_id,
-            "content_state": {"file_path": abs_path, "delete_source": False},
-            "notebook_ids": [],
-            "transformations": [str(t) for t in (conn.transformations or [])],
-            "embed": bool(conn.embed),
-        },
-    )
-
-
-async def _vault_safe_delete(source: Source) -> None:
-    """Delete a synced Source WITHOUT unlinking the user's vault file on disk."""
-    if source.asset:
-        source.asset.file_path = None  # skip os.unlink in Source.delete()
-    await source.delete()
-
-
-# ---------------------------------------------------------------------------
-# Command
+# Command — the disk driver. Walks the folder + 3-way diff, then delegates the
+# per-file ADD/UPDATE/DELETE/RENAME to the shared appliers in vault_engine.
 # ---------------------------------------------------------------------------
 @command(
     "sync_vault",
@@ -166,38 +136,26 @@ async def sync_vault_command(input_data: SyncVaultInput) -> SyncVaultOutput:
         subscribers = await VaultSubscription.for_connection(str(conn.id))
         notebook_ids = [str(s.notebook) for s in subscribers]
 
-        existing = {fs.rel_path: fs for fs in await VaultFileState.for_connection(str(conn.id))}
-
-        # Apply explicit renames first: re-key the file_state and re-title the
-        # Source in place. Same content, so we never re-process or re-embed.
+        # Apply explicit renames first via the shared applier (same content, so
+        # no re-process / re-embed). Disk supplies the new abs path + stat.
         if input_data.moves:
             for mv in input_data.moves:
-                prev = existing.get(mv.from_rel)
-                if prev is None:
-                    continue  # unknown source; the dest is handled as a normal add
                 new_abs = os.path.join(conn.root_path, mv.to_rel.replace("/", os.sep))
-                try:
-                    source = await Source.get(str(prev.source))
-                    if source.asset:
-                        source.asset.file_path = new_abs
-                    else:
-                        source.asset = Asset(file_path=new_abs)
-                    source.title = _file_title(mv.to_rel)
-                    await source.save()
-                except Exception as e:
-                    logger.warning(f"Vault move: source {prev.source} re-title: {e}")
-                del existing[mv.from_rel]
-                prev.rel_path = mv.to_rel
+                st = None
                 try:
                     st = os.stat(new_abs)
-                    prev.mtime = st.st_mtime
-                    prev.size = st.st_size
                 except OSError:
                     pass
-                prev.last_seen_at = datetime.now()
-                await prev.save()
-                existing[mv.to_rel] = prev
-                stats["updated"] += 1
+                result = await apply_rename(
+                    conn,
+                    mv.from_rel,
+                    mv.to_rel,
+                    new_abs=new_abs,
+                    mtime=st.st_mtime if st else None,
+                    size=st.st_size if st else None,
+                )
+                if result == "ok":
+                    stats["updated"] += 1
 
         # Restrict the walk to specific files for a targeted (live) pass.
         targeted = set(input_data.rel_paths or []) if is_targeted else None
@@ -214,8 +172,8 @@ async def sync_vault_command(input_data: SyncVaultInput) -> SyncVaultOutput:
                 logger.warning(f"Cannot stat {abs_path}: {e}")
                 stats["skipped"] += 1
                 continue
-            prev = existing.get(rel_path)
 
+            prev = await VaultFileState.find(str(conn.id), rel_path)
             # Pre-filter with mtime+size to skip hashing unchanged files.
             if prev and prev.mtime == st.st_mtime and prev.size == st.st_size:
                 prev.last_seen_at = datetime.now()
@@ -224,60 +182,32 @@ async def sync_vault_command(input_data: SyncVaultInput) -> SyncVaultOutput:
                 continue
 
             content_hash = _hash_file(abs_path)
-
-            if prev is None:
-                # ADD
-                source = Source(
-                    title=_file_title(rel_path),
-                    asset=Asset(file_path=abs_path),
-                )
-                await source.save()
-                await _submit_process(str(source.id), abs_path, conn)
-                fs = VaultFileState(
-                    connection=str(conn.id),
-                    rel_path=rel_path,
-                    source=str(source.id),
-                    content_hash=content_hash,
-                    mtime=st.st_mtime,
-                    size=st.st_size,
-                    last_seen_at=datetime.now(),
-                )
-                await fs.save()
-                for nb in notebook_ids:
-                    await source.add_to_notebook(nb)
+            action, _src = await apply_upsert(
+                conn,
+                rel_path=rel_path,
+                content_state={"file_path": abs_path, "delete_source": False},
+                content_hash=content_hash,
+                mtime=st.st_mtime,
+                size=st.st_size,
+                notebook_ids=notebook_ids,
+                existing=prev,
+            )
+            if action == "added":
                 stats["added"] += 1
-            elif prev.content_hash != content_hash:
-                # UPDATE — re-process the existing source; subscribers stay attached.
-                await _submit_process(str(prev.source), abs_path, conn)
-                prev.content_hash = content_hash
-                prev.mtime = st.st_mtime
-                prev.size = st.st_size
-                prev.last_seen_at = datetime.now()
-                await prev.save()
+            elif action == "updated":
                 stats["updated"] += 1
             else:
-                prev.last_seen_at = datetime.now()
-                await prev.save()
                 stats["skipped"] += 1
 
         # DELETE: a full scan removes every unseen row; a targeted pass only
         # removes the explicitly-named paths that are now missing on disk.
-        if targeted is None:
-            to_delete = [(rp, fs) for rp, fs in existing.items() if rp not in seen]
-        else:
-            to_delete = [
-                (rp, fs)
-                for rp, fs in existing.items()
-                if rp in targeted and rp not in seen
-            ]
-        for rel_path, fs in to_delete:
-            try:
-                source = await Source.get(str(fs.source))
-                await _vault_safe_delete(source)
-            except Exception as e:
-                logger.warning(f"Vault delete: source {fs.source} cleanup: {e}")
-            await fs.delete()
-            stats["removed"] += 1
+        for fs in await VaultFileState.for_connection(str(conn.id)):
+            if fs.rel_path in seen:
+                continue
+            if targeted is not None and fs.rel_path not in targeted:
+                continue
+            if await apply_delete(conn, fs.rel_path) == "ok":
+                stats["removed"] += 1
 
         # Finalize connection state.
         conn.stats = stats

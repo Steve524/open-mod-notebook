@@ -194,6 +194,17 @@ class VaultFileState(ObjectModel):
         )
         return [cls(**r) for r in rows] if rows else []
 
+    @classmethod
+    async def find(
+        cls, connection_id: str, rel_path: str
+    ) -> Optional["VaultFileState"]:
+        """The single file_state for (connection, rel_path) — the diff key."""
+        rows = await repo_query(
+            "SELECT * FROM vault_file_state WHERE connection = $c AND rel_path = $r LIMIT 1",
+            {"c": ensure_record_id(connection_id), "r": rel_path},
+        )
+        return cls(**rows[0]) if rows else None
+
 
 async def global_vault_sync_mode() -> str:
     """Read the global default vault sync mode straight from the DB.
