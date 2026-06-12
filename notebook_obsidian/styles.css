@@ -1,0 +1,49 @@
+/* Portions derived from SurfSense (https://github.com/MODSetter/SurfSense), Apache-2.0; modified for Open Notebook. */
+/*
+ * Open Notebook Obsidian plugin styles. Status-bar widget only — the settings
+ * tab uses Obsidian's stock Setting rows, no custom CSS needed.
+ */
+
+.notebook-sync-status {
+	gap: 6px;
+}
+
+.notebook-sync-status--clickable {
+	cursor: pointer;
+}
+
+.notebook-sync-status__icon {
+	display: inline-flex;
+	width: 14px;
+	height: 14px;
+}
+
+.notebook-sync-status__icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.notebook-sync-status--err .notebook-sync-status__icon {
+	color: var(--color-red);
+}
+
+.notebook-sync-connection-indicator {
+	display: inline-flex;
+	width: 14px;
+	height: 14px;
+}
+
+.notebook-sync-connection-heading {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.notebook-sync-connection-indicator svg {
+	width: 14px;
+	height: 14px;
+}
+
+.notebook-sync-connection-indicator--err {
+	color: var(--color-red);
+}

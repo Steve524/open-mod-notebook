@@ -1,0 +1,10 @@
+{
+	"id": "open-notebook-obsidian",
+	"name": "Open Notebook",
+	"version": "0.1.0",
+	"minAppVersion": "1.5.4",
+	"description": "Sync your Obsidian vault into Open Notebook as searchable sources.",
+	"author": "Steve524",
+	"authorUrl": "https://github.com/Steve524/open-mod-notebook",
+	"isDesktopOnly": false
+}

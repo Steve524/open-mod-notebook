@@ -1,0 +1,21 @@
+Open Notebook Obsidian plugin
+=============================
+
+This plugin (the notebook_obsidian/ folder) is a derivative work of the
+SurfSense Obsidian plugin (https://github.com/MODSetter/SurfSense),
+Copyright (c) SurfSense, licensed under the Apache License, Version 2.0.
+
+Modifications (c) 2026 Steve524, also licensed under the Apache License 2.0.
+See the LICENSE file in this folder for the full license text.
+
+Changes from the original (Apache-2.0 Section 4(b) statement of changes):
+- Rebranded to "Open Notebook"; removed all SurfSense names and trademarks.
+- Re-pointed to the Open Notebook backend and its /api/v1 wire contract.
+- Relabeled "search space" -> "notebook" in user-facing strings (internal
+  field names such as searchSpaceId are retained).
+- Changed connector/search-space id types from numeric to string, because
+  Open Notebook uses SurrealDB string record ids.
+- Changed the default server URL to http://localhost:5055.
+
+The reused sync/queue/payload/vault-identity/excludes machinery is carried
+over from SurfSense with only the above branding and type changes.
