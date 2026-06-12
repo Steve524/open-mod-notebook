@@ -1,3 +1,7 @@
+# SHELVED: server-side filesystem watcher for the disk vault model; superseded
+# by the notebook_obsidian push plugin. Gated by OPEN_NOTEBOOK_ENABLE_LOCAL_VAULTS
+# (off by default) — api/main.py only starts this when local vaults are enabled.
+# Kept, not deleted, for recoverability.
 """Live filesystem watching for vault connections (Phase 5).
 
 Hosted in the API process (single owner → no double-ingest). A watchdog

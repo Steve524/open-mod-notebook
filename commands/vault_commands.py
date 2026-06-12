@@ -1,9 +1,15 @@
-"""Vault sync engine — the `sync_vault` background command.
+# SHELVED: server-side disk vault sync; superseded by the notebook_obsidian
+# push model. Gated by OPEN_NOTEBOOK_ENABLE_LOCAL_VAULTS (off by default) — the
+# refresh endpoints and the filesystem watcher that submit this command are
+# disabled, so `sync_vault` is inert unless local vaults are re-enabled. Kept,
+# not deleted, for recoverability. The per-file appliers it calls live in
+# commands/vault_engine.py and ARE shared with the (active) push path.
+"""Vault sync engine — the `sync_vault` background command (disk driver).
 
 Walks a connection's folder, runs a 3-way diff against `vault_file_state`, and
-applies ADD/UPDATE/DELETE by reusing the normal source pipeline (`process_source`).
-Runs in the worker (never the API thread). `rel_paths` present = targeted
-single-file pass (live watch); absent = full scan.
+applies ADD/UPDATE/DELETE via the shared appliers. Runs in the worker (never
+the API thread). `rel_paths` present = targeted single-file pass (live watch);
+absent = full scan.
 """
 
 import hashlib
@@ -59,6 +65,7 @@ def _build_spec(globs: List[str]) -> pathspec.PathSpec:
     return pathspec.PathSpec.from_lines("gitwildmatch", globs or [])
 
 
+# SHELVED: disk walk — only runs when local vaults are enabled.
 def _iter_files(root: str, include: pathspec.PathSpec, exclude: pathspec.PathSpec):
     """Yield (rel_path, abs_path) for files matching include and not exclude."""
     for dirpath, dirnames, filenames in os.walk(root):
@@ -77,6 +84,7 @@ def _iter_files(root: str, include: pathspec.PathSpec, exclude: pathspec.PathSpe
             yield rel_path, abs_path
 
 
+# SHELVED: disk hashing — only runs when local vaults are enabled.
 def _hash_file(abs_path: str) -> str:
     """Hash raw bytes so changes to ANY file type (PDFs, docx, …) are detected.
 

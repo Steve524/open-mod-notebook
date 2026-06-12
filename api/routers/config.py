@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request
 from loguru import logger
 
 from open_notebook.database.repository import repo_query
+from open_notebook.domain.vault import local_vaults_enabled
 from open_notebook.utils.version_utils import (
     compare_versions,
     get_version_from_github_async,
@@ -157,4 +158,9 @@ async def get_config(request: Request):
         "latestVersion": latest_version,
         "hasUpdate": has_update,
         "dbStatus": db_status,
+        "features": {
+            # The server-side disk vault model is shelved by default; the UI
+            # hides the browse/validate/link flow unless it's re-enabled.
+            "localVaults": local_vaults_enabled(),
+        },
     }

@@ -148,11 +148,20 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Podcast profile migration encountered errors: {e}")
         # Non-fatal: profiles can be migrated manually via UI
 
-    # Start vault filesystem watchers for live-mode connections.
+    # Start vault filesystem watchers for live-mode connections — only when the
+    # SHELVED server-side disk vault model is explicitly enabled.
     try:
-        from api.vault_watcher import get_vault_watcher
+        from open_notebook.domain.vault import local_vaults_enabled
 
-        await get_vault_watcher().start()
+        if local_vaults_enabled():
+            from api.vault_watcher import get_vault_watcher
+
+            await get_vault_watcher().start()
+        else:
+            logger.info(
+                "Local/disk vaults disabled (OPEN_NOTEBOOK_ENABLE_LOCAL_VAULTS); "
+                "vault watcher not started. Use the Obsidian push plugin."
+            )
     except Exception as e:
         logger.warning(f"Vault watcher failed to start: {e}")
         # Non-fatal: manual refresh still works

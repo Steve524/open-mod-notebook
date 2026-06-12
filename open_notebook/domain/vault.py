@@ -8,6 +8,7 @@ Record-link fields use the same `Union[str, RecordID]` + validator pattern as
 `Source.command` so they persist as proper SurrealDB record links.
 """
 
+import os
 from datetime import datetime
 from typing import Any, ClassVar, Dict, List, Optional, Union
 
@@ -64,6 +65,21 @@ def is_supported_file(name: str) -> bool:
     """True if a filename has a supported, ingestable extension."""
     lower = name.lower()
     return any(lower.endswith("." + ext) for ext in SUPPORTED_EXTENSIONS)
+
+
+def local_vaults_enabled() -> bool:
+    """Whether the SHELVED server-side disk/local vault model is enabled.
+
+    Off by default — the Obsidian push plugin (``notebook_obsidian/``) is the
+    supported path. Set ``OPEN_NOTEBOOK_ENABLE_LOCAL_VAULTS=true`` to re-enable
+    the disk walk + folder browse + filesystem watcher.
+    """
+    return os.environ.get("OPEN_NOTEBOOK_ENABLE_LOCAL_VAULTS", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
 
 
 def _to_record(value: Any) -> Any:

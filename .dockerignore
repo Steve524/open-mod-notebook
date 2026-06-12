@@ -23,6 +23,11 @@ frontend/out
 frontend/.env*
 frontend/*.log
 
+# Obsidian plugin (not part of the backend image) + its build artifacts.
+# node_modules contains symlinks that break the Docker build context.
+notebook_obsidian
+notes
+
 # Project data
 .antigravity
 .gemini

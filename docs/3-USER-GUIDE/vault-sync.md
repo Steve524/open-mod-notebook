@@ -1,8 +1,18 @@
-# Vault Sync (Obsidian & local folders)
+# Vault Sync (Obsidian)
 
-Connect a local folder — typically an [Obsidian](https://obsidian.md) vault — and have its documents ingested as normal Open Notebook **sources**, kept in sync as you edit. **All supported document types** are imported (Markdown, PDF, Word/Excel/PowerPoint, plain text, source code, and structured data like XML and YAML), not just Markdown; HTML, JSON, CSV, EPUB, images, audio, and video are skipped. Ingestion happens **once per file** at the workspace level; notebooks **subscribe** to a vault, so the same vault can feed many notebooks with no duplicate ingestion or embedding.
+The supported way to sync an [Obsidian](https://obsidian.md) vault into Open Notebook is the **companion Obsidian plugin**. It runs inside Obsidian and **pushes** your notes to the backend over HTTP — no shared filesystem, bind mount, or server-side folder access required, and it works on mobile.
 
-> **Key idea:** the **server** reads the folder, not your browser. The path you enter is the path *as the server sees it*. On a local install that's a normal path; in Docker you bind-mount the vault and enter the in-container path (see [Docker](#docker-mounting-your-vault)).
+➡️ **See the [Obsidian plugin install guide](../../notebook_obsidian/README.md)** to build, install, and configure it.
+
+Each note becomes a normal Open Notebook **source** in the notebook you pick, processed and embedded once, and kept in sync as you edit. A second notebook can **subscribe** to the same vault and reuse those sources with no re-ingest. All supported document types are imported (Markdown, PDF, Word/Excel/PowerPoint, plain text, source code, XML, YAML); other types are skipped.
+
+---
+
+## Shelved: server-side folder mount (legacy)
+
+> **This model is shelved and off by default.** Instead of the plugin pushing notes, it made the **server** read a folder from disk (bind-mounted into Docker, browsed via a server-side folder picker). It's superseded by the push plugin above but kept and recoverable.
+>
+> To re-enable it, set **`OPEN_NOTEBOOK_ENABLE_LOCAL_VAULTS=true`** on the backend. While it's off, the browse / validate / link / refresh endpoints return `410` and the folder-picker UI is hidden; subscribing to and removing existing vaults still works. Everything below describes this legacy model.
 
 ---
 

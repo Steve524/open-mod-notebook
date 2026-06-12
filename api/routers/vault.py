@@ -25,6 +25,7 @@ from open_notebook.domain.vault import (
     VaultFileState,
     VaultSubscription,
     is_supported_file,
+    local_vaults_enabled,
 )
 
 # Import so the sync_vault command is registered in the API process registry.
@@ -151,6 +152,20 @@ def _require_allowed(root_path: str) -> None:
         raise HTTPException(
             status_code=400,
             detail="Path is outside the allowed vaults base directory (OPEN_NOTEBOOK_VAULTS_BASE_DIR)",
+        )
+
+
+def _require_local_enabled() -> None:
+    """Gate the SHELVED server-side disk vault endpoints (browse/validate/link/
+    refresh/watch). Off by default — push via the Obsidian plugin instead."""
+    if not local_vaults_enabled():
+        raise HTTPException(
+            status_code=410,
+            detail=(
+                "Server-side disk vault sync is disabled "
+                "(OPEN_NOTEBOOK_ENABLE_LOCAL_VAULTS). Use the Obsidian plugin "
+                "(push) — see notebook_obsidian/."
+            ),
         )
 
 
@@ -297,6 +312,7 @@ async def list_connections():
 
 @router.post("/vault-connections", response_model=VaultConnectionResponse)
 async def create_connection(body: VaultConnectionCreate):
+    _require_local_enabled()
     body.root_path = _to_container(body.root_path)
     _require_allowed(body.root_path)
     conn = _apply_create(body)
@@ -307,6 +323,7 @@ async def create_connection(body: VaultConnectionCreate):
 
 @router.patch("/vault-connections/{connection_id}", response_model=VaultConnectionResponse)
 async def update_connection(connection_id: str, body: VaultConnectionUpdate):
+    _require_local_enabled()
     conn = await VaultConnection.get(connection_id)
     if body.root_path is not None:
         body.root_path = _to_container(body.root_path)
@@ -432,6 +449,7 @@ async def unsubscribe(notebook_id: str, subscription_id: str):
 @router.post("/notebooks/{notebook_id}/vault/link", response_model=VaultConnectionResponse)
 async def link_vault(notebook_id: str, body: VaultConnectionCreate):
     """Create a connection, subscribe this notebook, and kick off the first sync."""
+    _require_local_enabled()
     body.root_path = _to_container(body.root_path)
     _require_allowed(body.root_path)
     conn = _apply_create(body)
@@ -448,6 +466,7 @@ async def link_vault(notebook_id: str, body: VaultConnectionCreate):
 # ---------------------------------------------------------------------------
 @router.post("/notebooks/{notebook_id}/vault/refresh", response_model=VaultJobResponse)
 async def refresh_notebook_vaults(notebook_id: str):
+    _require_local_enabled()
     subs = await VaultSubscription.for_notebook(notebook_id)
     job_ids = []
     for sub in subs:
@@ -460,6 +479,7 @@ async def refresh_notebook_vaults(notebook_id: str):
 
 @router.post("/vault-connections/refresh-all", response_model=VaultJobResponse)
 async def refresh_all():
+    _require_local_enabled()
     conns = await VaultConnection.get_all()
     job_ids = [
         str(submit_command("open_notebook", "sync_vault", {"connection_id": str(c.id)}))
@@ -470,6 +490,7 @@ async def refresh_all():
 
 @router.post("/vault-connections/{connection_id}/refresh", response_model=VaultJobResponse)
 async def refresh_one(connection_id: str):
+    _require_local_enabled()
     await VaultConnection.get(connection_id)  # 404 if missing
     jid = submit_command("open_notebook", "sync_vault", {"connection_id": connection_id})
     return VaultJobResponse(job_ids=[str(jid)])
@@ -492,6 +513,7 @@ async def connection_status(connection_id: str):
 @router.post("/vault-connections/{connection_id}/watch/start")
 async def watch_start(connection_id: str):
     """Start watching this connection if its effective mode is live."""
+    _require_local_enabled()
     await VaultConnection.get(connection_id)  # 404 if missing
     await _reconcile_watchers()
     return get_vault_watcher().status()
@@ -500,6 +522,7 @@ async def watch_start(connection_id: str):
 @router.post("/vault-connections/{connection_id}/watch/stop")
 async def watch_stop(connection_id: str):
     """Stop watching this connection until the next reconcile."""
+    _require_local_enabled()
     await VaultConnection.get(connection_id)  # 404 if missing
     await get_vault_watcher().stop_connection(connection_id)
     return get_vault_watcher().status()
@@ -521,6 +544,7 @@ async def supported_extensions():
     The frontend prefills the Add-a-vault dialog from this, so backend and
     frontend can't drift on what "all supported types" means.
     """
+    _require_local_enabled()
     return SupportedExtensionsResponse(
         extensions=list(SUPPORTED_EXTENSIONS),
         include_globs=list(DEFAULT_INCLUDE_GLOBS),
@@ -530,6 +554,7 @@ async def supported_extensions():
 
 @router.post("/vault/validate-path", response_model=ValidatePathResponse)
 async def validate_path(body: ValidatePathRequest):
+    _require_local_enabled()
     body.root_path = _to_container(body.root_path) or body.root_path
     p = Path(body.root_path)
     exists = p.exists()
@@ -571,6 +596,7 @@ async def browse(path: Optional[str] = Query(None)):
     (in Docker, that's the in-container path). Honors the optional
     OPEN_NOTEBOOK_VAULTS_BASE_DIR allowlist as a hard navigation boundary.
     """
+    _require_local_enabled()
     base = _allowed_base()
     requested = _to_container(path.strip()) if path and path.strip() else None
     target = os.path.realpath(requested) if requested else _default_browse_root()
