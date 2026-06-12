@@ -361,7 +361,7 @@ export function AddVaultDialog({
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-sm truncate">{conn.name}</p>
                           <p className="text-xs text-muted-foreground font-mono truncate">
-                            {conn.root_path}
+                            {conn.root_path || t('vault.pushVault')}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {t('vault.subscribers').replace(

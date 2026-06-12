@@ -14,7 +14,7 @@ export type VaultSyncMode = 'inherit' | 'manual' | 'live'
 export interface VaultConnectionResponse {
   id: string
   name: string
-  root_path: string
+  root_path?: string | null  // null for push connections (no folder)
   sync_mode: VaultSyncMode
   include_globs: string[]
   exclude_globs: string[]

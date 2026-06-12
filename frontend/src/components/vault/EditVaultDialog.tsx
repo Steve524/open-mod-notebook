@@ -43,7 +43,7 @@ export function EditVaultDialog({ connection, open, onOpenChange }: EditVaultDia
   const update = useUpdateVaultConnection()
 
   const [name, setName] = useState(connection.name)
-  const [rootPath, setRootPath] = useState(connection.root_path)
+  const [rootPath, setRootPath] = useState(connection.root_path ?? '')
   const [includeText, setIncludeText] = useState(connection.include_globs.join('\n'))
   const [excludeText, setExcludeText] = useState(connection.exclude_globs.join('\n'))
   const [syncMode, setSyncMode] = useState<VaultSyncMode>(connection.sync_mode)

@@ -69,7 +69,7 @@ class VaultConnectionUpdate(BaseModel):
 class VaultConnectionResponse(BaseModel):
     id: str
     name: str
-    root_path: str
+    root_path: Optional[str] = None  # None for push connections (no folder)
     sync_mode: str
     include_globs: List[str]
     exclude_globs: List[str]
