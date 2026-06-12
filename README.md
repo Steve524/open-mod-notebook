@@ -64,6 +64,12 @@ Link a folder on your machine to a notebook and its documents become normal sour
 
 Set `VAULTS_HOST_DIR` in `.env`, run the local build below, then in a notebook use **Sources → Connect a vault → Browse**. See [SETUP.md](SETUP.md#sync-a-local-folder-obsidian-vault) and the [Vault Sync guide](docs/3-USER-GUIDE/vault-sync.md).
 
+### 🔌 Obsidian plugin — push a vault from inside Obsidian
+
+As an alternative to the server-reads-a-folder model above, a companion **Obsidian plugin** in [`notebook_obsidian/`](./notebook_obsidian/README.md) runs inside Obsidian and **pushes** your vault to Open Notebook over HTTP — no shared filesystem or bind mount needed, and it works on mobile. Each note becomes a source in the notebook you pick, kept in sync as you edit. See the [plugin install guide](./notebook_obsidian/README.md) to build and load it.
+
+> The `notebook_obsidian/` folder is licensed under **Apache-2.0** (derived from the SurfSense Obsidian plugin); see its [`LICENSE`](./notebook_obsidian/LICENSE) and [`NOTICE`](./notebook_obsidian/NOTICE). The rest of this repository remains under its existing license.
+
 ### 🎨 Three new themes
 
 Alongside Light / Dark / System, the theme switcher (sidebar and ⌘K command palette) adds:
