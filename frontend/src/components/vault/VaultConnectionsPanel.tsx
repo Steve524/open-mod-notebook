@@ -27,6 +27,7 @@ import {
 } from '@/lib/hooks/use-vault'
 import { VaultConnectionResponse } from '@/lib/types/vault'
 import { useTranslation } from '@/lib/hooks/use-translation'
+import { useLocalVaultsEnabled } from '@/lib/hooks/use-local-vaults'
 import { EditVaultDialog } from '@/components/vault/EditVaultDialog'
 import { RemoveVaultDialog } from '@/components/vault/RemoveVaultDialog'
 
@@ -72,6 +73,7 @@ function formatDate(value: string | null | undefined, neverLabel: string): strin
 
 export function VaultConnectionsPanel() {
   const { t } = useTranslation()
+  const localEnabled = useLocalVaultsEnabled()
   const { data: connections, isLoading } = useVaultConnections()
   const refreshAll = useRefreshAllVaults()
   const refreshOne = useRefreshConnection()
@@ -105,15 +107,17 @@ export function VaultConnectionsPanel() {
             ({connections.length})
           </span>
         </h2>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => refreshAll.mutate()}
-          disabled={refreshAll.isPending}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshAll.isPending ? 'animate-spin' : ''}`} />
-          {t('vault.refreshAll')}
-        </Button>
+        {localEnabled && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => refreshAll.mutate()}
+            disabled={refreshAll.isPending}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshAll.isPending ? 'animate-spin' : ''}`} />
+            {t('vault.refreshAll')}
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border overflow-x-auto">
@@ -135,7 +139,7 @@ export function VaultConnectionsPanel() {
               <tr key={conn.id} className="border-b last:border-0 hover:bg-muted/30">
                 <td className="h-12 px-4 font-medium">{conn.name}</td>
                 <td className="h-12 px-4 font-mono text-xs text-muted-foreground max-w-[260px] truncate">
-                  {conn.root_path}
+                  {conn.root_path || t('vault.pushVault')}
                 </td>
                 <td className="h-12 px-4">
                   <Badge
@@ -161,18 +165,22 @@ export function VaultConnectionsPanel() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => refreshOne.mutate(conn.id)}
-                        disabled={conn.status === 'scanning'}
-                      >
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        {t('vault.refreshNow')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setEditTarget(conn)}>
-                        <Pencil className="h-4 w-4 mr-2" />
-                        {t('common.edit')}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
+                      {localEnabled && (
+                        <>
+                          <DropdownMenuItem
+                            onClick={() => refreshOne.mutate(conn.id)}
+                            disabled={conn.status === 'scanning'}
+                          >
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            {t('vault.refreshNow')}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setEditTarget(conn)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            {t('common.edit')}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
                       <DropdownMenuItem
                         onClick={() => setRemoveTarget(conn)}
                         className="text-destructive focus:text-destructive"

@@ -24,6 +24,7 @@ import {
 } from '@/lib/hooks/use-vault'
 import { VaultSubscriptionResponse } from '@/lib/types/vault'
 import { useTranslation } from '@/lib/hooks/use-translation'
+import { useLocalVaultsEnabled } from '@/lib/hooks/use-local-vaults'
 
 interface ConnectedVaultsProps {
   notebookId: string
@@ -51,6 +52,7 @@ function statsSummary(sub: VaultSubscriptionResponse): string | null {
 
 export function ConnectedVaults({ notebookId }: ConnectedVaultsProps) {
   const { t } = useTranslation()
+  const localEnabled = useLocalVaultsEnabled()
   const { data: subscriptions, isLoading } = useNotebookVaultSubscriptions(notebookId)
   const refreshConnection = useRefreshVaultConnection(notebookId)
   const unsubscribe = useUnsubscribeVault(notebookId)
@@ -102,7 +104,7 @@ export function ConnectedVaults({ notebookId }: ConnectedVaultsProps) {
                 )}
               </div>
               <p className="text-xs text-muted-foreground font-mono truncate">
-                {conn.root_path}
+                {conn.root_path || t('vault.pushVault')}
               </p>
               <p className="text-xs text-muted-foreground">
                 {t('vault.lastSynced')}: {formatLastSynced(conn.last_synced_at, t('vault.neverSynced'))}
@@ -123,13 +125,15 @@ export function ConnectedVaults({ notebookId }: ConnectedVaultsProps) {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => refreshConnection.mutate(conn.id)}
-                  disabled={isScanning}
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  {t('vault.refreshNow')}
-                </DropdownMenuItem>
+                {localEnabled && (
+                  <DropdownMenuItem
+                    onClick={() => refreshConnection.mutate(conn.id)}
+                    disabled={isScanning}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    {t('vault.refreshNow')}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onClick={() => setUnsubTarget(sub)}
                   className="text-destructive focus:text-destructive"

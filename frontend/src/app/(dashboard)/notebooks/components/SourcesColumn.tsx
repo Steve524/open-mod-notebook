@@ -20,6 +20,7 @@ import { ConnectedVaults } from '@/components/vault/ConnectedVaults'
 import { SourceCard } from '@/components/sources/SourceCard'
 import { useDeleteSource, useRetrySource, useRemoveSourceFromNotebook } from '@/lib/hooks/use-sources'
 import { useNotebookVaultSubscriptions, useRefreshNotebookVaults } from '@/lib/hooks/use-vault'
+import { useLocalVaultsEnabled } from '@/lib/hooks/use-local-vaults'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { useModalManager } from '@/lib/hooks/use-modal-manager'
 import { ContextMode } from '../[id]/page'
@@ -68,6 +69,7 @@ export function SourcesColumn({
   const removeFromNotebook = useRemoveSourceFromNotebook()
 
   // Vault sync
+  const localVaultsEnabled = useLocalVaultsEnabled()
   const { data: vaultSubscriptions } = useNotebookVaultSubscriptions(notebookId)
   const refreshVaults = useRefreshNotebookVaults(notebookId)
   const hasVaults = (vaultSubscriptions?.length ?? 0) > 0
@@ -175,16 +177,18 @@ export function SourcesColumn({
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-lg">{t('navigation.sources')}</CardTitle>
               <div className="flex items-center gap-2">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={handleRefreshVaults}
-                  disabled={refreshVaults.isPending}
-                  title={hasVaults ? t('vault.refresh') : t('vault.addVault')}
-                  aria-label={hasVaults ? t('vault.refresh') : t('vault.addVault')}
-                >
-                  <RefreshCw className={`h-4 w-4 ${refreshVaults.isPending ? 'animate-spin' : ''}`} />
-                </Button>
+                {localVaultsEnabled && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={handleRefreshVaults}
+                    disabled={refreshVaults.isPending}
+                    title={hasVaults ? t('vault.refresh') : t('vault.addVault')}
+                    aria-label={hasVaults ? t('vault.refresh') : t('vault.addVault')}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${refreshVaults.isPending ? 'animate-spin' : ''}`} />
+                  </Button>
+                )}
                 <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
                   <DropdownMenuTrigger asChild>
                     <Button size="sm">

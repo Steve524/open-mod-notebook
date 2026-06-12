@@ -8,6 +8,9 @@ export interface BackendConfigResponse {
   latestVersion?: string | null
   hasUpdate?: boolean
   dbStatus?: "online" | "offline"
+  features?: {
+    localVaults?: boolean
+  }
 }
 
 /**
@@ -21,6 +24,8 @@ export interface AppConfig {
   latestVersion?: string | null
   hasUpdate?: boolean
   dbStatus?: "online" | "offline"
+  /** Whether the shelved server-side disk vault model is enabled. */
+  localVaults: boolean
 }
 
 /**

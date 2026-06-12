@@ -14,6 +14,7 @@ import { useSettings, useUpdateSettings } from '@/lib/hooks/use-settings'
 import { useEffect, useState } from 'react'
 import { ChevronDownIcon } from 'lucide-react'
 import { useTranslation } from '@/lib/hooks/use-translation'
+import { useLocalVaultsEnabled } from '@/lib/hooks/use-local-vaults'
 
 const settingsSchema = z.object({
   default_content_processing_engine_doc: z.enum(['auto', 'docling', 'simple']).optional(),
@@ -27,6 +28,7 @@ type SettingsFormData = z.infer<typeof settingsSchema>
 
 export function SettingsForm() {
   const { t } = useTranslation()
+  const localVaultsEnabled = useLocalVaultsEnabled()
   const { data: settings, isLoading, error } = useSettings()
   const updateSettings = useUpdateSettings()
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -270,6 +272,27 @@ export function SettingsForm() {
 
       <Card>
         <CardHeader>
+          <CardTitle>{t('settings.obsidianSync')}</CardTitle>
+          <CardDescription>
+            {t('settings.obsidianSyncDesc')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <p>{t('settings.obsidianSyncBody')}</p>
+          <a
+            href="https://github.com/Steve524/open-mod-notebook/blob/main/notebook_obsidian/README.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline underline-offset-2"
+          >
+            {t('settings.obsidianSyncGuide')}
+          </a>
+        </CardContent>
+      </Card>
+
+      {localVaultsEnabled && (
+      <Card>
+        <CardHeader>
           <CardTitle>{t('settings.vaultSync')}</CardTitle>
           <CardDescription>
             {t('settings.vaultSyncDesc')}
@@ -303,6 +326,7 @@ export function SettingsForm() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       <div className="flex justify-end">
          <Button

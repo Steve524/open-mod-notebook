@@ -37,6 +37,7 @@ import {
   ValidatePathResponse,
 } from '@/lib/types/vault'
 import { useTranslation } from '@/lib/hooks/use-translation'
+import { useLocalVaultsEnabled } from '@/lib/hooks/use-local-vaults'
 
 interface AddVaultDialogProps {
   open: boolean
@@ -62,6 +63,7 @@ export function AddVaultDialog({
   onSuccess,
 }: AddVaultDialogProps) {
   const { t } = useTranslation()
+  const localEnabled = useLocalVaultsEnabled()
 
   // Link-new form state
   const [name, setName] = useState('')
@@ -174,18 +176,26 @@ export function AddVaultDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FolderGit2 className="h-5 w-5" />
-            {t('vault.addVault')}
+            {localEnabled ? t('vault.addVault') : t('vault.subscribeTitle')}
           </DialogTitle>
-          <DialogDescription>{t('vault.addVaultDesc')}</DialogDescription>
+          <DialogDescription>
+            {localEnabled ? t('vault.addVaultDesc') : t('vault.subscribeOnlyDesc')}
+          </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="link" className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="link">{t('vault.linkNew')}</TabsTrigger>
-            <TabsTrigger value="subscribe">{t('vault.subscribeExisting')}</TabsTrigger>
-          </TabsList>
+        <Tabs
+          defaultValue={localEnabled ? 'link' : 'subscribe'}
+          className="flex-1 overflow-hidden flex flex-col"
+        >
+          {localEnabled && (
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="link">{t('vault.linkNew')}</TabsTrigger>
+              <TabsTrigger value="subscribe">{t('vault.subscribeExisting')}</TabsTrigger>
+            </TabsList>
+          )}
 
-          {/* Link a new vault */}
+          {/* Link a new vault (disk model — gated) */}
+          {localEnabled && (
           <TabsContent value="link" className="flex-1 overflow-y-auto space-y-4 px-1 pt-2">
             <div className="space-y-2">
               <Label htmlFor="vault-name">{t('vault.nameLabel')}</Label>
@@ -318,6 +328,7 @@ export function AddVaultDialog({
               </Label>
             </div>
           </TabsContent>
+          )}
 
           {/* Subscribe to an existing vault */}
           <TabsContent value="subscribe" className="flex-1 overflow-hidden flex flex-col pt-2">
@@ -372,6 +383,7 @@ export function AddVaultDialog({
             <Button variant="outline" onClick={resetAndClose}>
               {t('common.cancel')}
             </Button>
+            {localEnabled && (
             <TabsContent value="link" className="m-0">
               <Button
                 onClick={handleLink}
@@ -387,6 +399,7 @@ export function AddVaultDialog({
                 )}
               </Button>
             </TabsContent>
+            )}
             <TabsContent value="subscribe" className="m-0">
               <Button
                 onClick={handleSubscribe}
